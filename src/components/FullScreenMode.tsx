@@ -34,12 +34,13 @@ export function FullScreenMode({
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const touchStartRef = useRef({ y: 0, time: 0 });
 
-  // Request fullscreen on mount
+  // Request fullscreen on mount (desktop only)
   useEffect(() => {
     const container = containerRef.current;
-    if (container) {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    if (container && !isMobile && document.fullscreenEnabled) {
       container.requestFullscreen().catch(() => {
-        // Fullscreen might not be available in some contexts
         console.log('Fullscreen not available');
       });
     }
@@ -79,6 +80,22 @@ export function FullScreenMode({
       }, 3000);
     }
   }, [showControls]);
+
+  // Handle keyboard shortcuts (ESC to exit)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onExit();
+      }
+      if (e.key === ' ') {
+        e.preventDefault();
+        onPlayPause();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onExit, onPlayPause]);
 
   // Handle touch start
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -164,7 +181,7 @@ export function FullScreenMode({
       {/* Controls overlay */}
       <div
         className={`bg-gradient-to-t from-black via-black/80 to-transparent transition-opacity duration-300 ${
-          showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          showControls ? 'opacity-100' : 'opacity-20'
         }`}
       >
         <div className="px-4 md:px-6 py-4 md:py-6 space-y-3 md:space-y-4">
