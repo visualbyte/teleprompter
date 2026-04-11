@@ -98,10 +98,36 @@ function App() {
           </div>
         )}
 
-        {/* Desktop: Display area + Controls */}
-        {/* Mobile: Teleprompter tab */}
-        {(activeTab === 'teleprompter' || window.innerWidth >= 768) && (
-          <>
+        {/* Desktop: Display area + Controls (always visible) */}
+        {/* Mobile: Teleprompter tab (visible when activeTab === 'teleprompter') */}
+        <div className="hidden md:flex flex-1 flex-col md:flex overflow-hidden">
+          <div className="flex-1 flex overflow-hidden">
+            <TeleprompterDisplay
+              content={script}
+              fontSize={fontSize}
+              scrollPosition={scrollPosition}
+              onMaxScroll={setMaxScroll}
+            />
+          </div>
+
+          {/* Controls */}
+          <div className="bg-white border-t border-gray-200">
+            <Controls
+              isPlaying={isPlaying}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onReset={handleReset}
+              speed={speed}
+              onSpeedChange={setSpeed}
+              fontSize={fontSize}
+              onFontSizeChange={setFontSize}
+            />
+          </div>
+        </div>
+
+        {/* Mobile: Teleprompter tab content */}
+        {activeTab === 'teleprompter' && (
+          <div className="md:hidden flex-1 flex flex-col overflow-hidden">
             <div className="flex-1 flex overflow-hidden">
               <TeleprompterDisplay
                 content={script}
@@ -124,7 +150,7 @@ function App() {
                 onFontSizeChange={setFontSize}
               />
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

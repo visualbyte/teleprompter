@@ -20,13 +20,13 @@ export function Controls({
   onFontSizeChange,
 }: ControlsProps) {
   return (
-    <div className="bg-white border-t border-gray-200 p-4">
+    <div className="bg-white border-t border-gray-200 p-2 md:p-4">
       <div className="max-w-4xl mx-auto">
-        {/* Play/Pause/Reset buttons */}
-        <div className="flex gap-2 mb-6">
+        {/* Play/Pause/Reset buttons - Compact */}
+        <div className="flex gap-1 md:gap-2 mb-2 md:mb-4">
           <button
             onClick={isPlaying ? onPause : onPlay}
-            className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-colors ${
+            className={`flex-1 px-2 md:px-4 py-2 md:py-3 rounded text-sm md:text-base font-semibold transition-colors ${
               isPlaying
                 ? 'bg-red-500 hover:bg-red-600 text-white'
                 : 'bg-green-500 hover:bg-green-600 text-white'
@@ -36,16 +36,16 @@ export function Controls({
           </button>
           <button
             onClick={onReset}
-            className="flex-1 px-4 py-3 rounded-lg font-semibold bg-gray-200 hover:bg-gray-300 text-gray-900 transition-colors"
+            className="flex-1 px-2 md:px-4 py-2 md:py-3 rounded text-sm md:text-base font-semibold bg-gray-200 hover:bg-gray-300 text-gray-900 transition-colors"
           >
             Reset
           </button>
         </div>
 
-        {/* Speed control */}
-        <div className="mb-6">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Scroll Speed: <span className="font-bold text-blue-600">{Math.round(speed)} px/s</span>
+        {/* Speed control - Compact on mobile */}
+        <div className="mb-2 md:mb-4">
+          <label className="text-xs md:text-sm font-semibold text-gray-700 block mb-1">
+            Speed: <span className="font-bold text-blue-600">{Math.round(speed)}</span>
           </label>
           <input
             type="range"
@@ -56,16 +56,12 @@ export function Controls({
             onChange={(e) => onSpeedChange(Number(e.target.value))}
             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
           />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>Slow</span>
-            <span>Fast</span>
-          </div>
         </div>
 
-        {/* Font size control */}
+        {/* Font size control - Compact on mobile */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Font Size: <span className="font-bold text-blue-600">{fontSize}px</span>
+          <label className="text-xs md:text-sm font-semibold text-gray-700 block mb-1">
+            Size: <span className="font-bold text-blue-600">{fontSize}px</span>
           </label>
           <input
             type="range"
@@ -76,10 +72,6 @@ export function Controls({
             onChange={(e) => onFontSizeChange(Number(e.target.value))}
             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
           />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>Small</span>
-            <span>Large</span>
-          </div>
         </div>
       </div>
     </div>
