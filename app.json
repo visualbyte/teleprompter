@@ -3,18 +3,22 @@
     "name": "Teleprompter",
     "slug": "teleprompter",
     "version": "1.0.0",
+    "scheme": "teleprompter",
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTabletMode": true,
-      "requireFullScreen": true
+      "requireFullScreen": true,
+      "bundleIdentifier": "com.visualbyte.teleprompter",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
-      }
+      },
+      "package": "com.visualbyte.teleprompter"
     },
     "web": {
       "favicon": "./assets/favicon.png"

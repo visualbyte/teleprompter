@@ -1,0 +1,35 @@
+{
+  "cli": {
+    "version": ">= 5.4.0"
+  },
+  "build": {
+    "preview": {
+      "ios": {
+        "buildType": "simulator"
+      }
+    },
+    "preview2": {
+      "ios": {
+        "buildType": "simulator"
+      }
+    },
+    "preview3": {
+      "ios": {
+        "buildType": "simulator"
+      }
+    },
+    "production": {
+      "ios": {
+        "buildType": "archive"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "serviceAccount": "~/.eas/credentials.json",
+        "appleTeamId": "YOUR_APPLE_TEAM_ID"
+      }
+    }
+  }
+}
