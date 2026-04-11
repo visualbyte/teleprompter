@@ -19,7 +19,6 @@ export function FullScreenMode({
   script,
   fontSize,
   scrollPosition,
-  maxScroll,
   onMaxScroll,
   isPlaying,
   onPlayPause,
@@ -31,7 +30,7 @@ export function FullScreenMode({
 }: FullScreenModeProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [showControls, setShowControls] = useState(true);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout>();
+  const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const touchStartRef = useRef({ y: 0, time: 0 });
 
   // Update max scroll when content changes
