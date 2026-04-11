@@ -29,9 +29,36 @@ export function FullScreenMode({
   onExit,
 }: FullScreenModeProps) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [showControls, setShowControls] = useState(true);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const touchStartRef = useRef({ y: 0, time: 0 });
+
+  // Request fullscreen on mount
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container) {
+      container.requestFullscreen().catch(() => {
+        // Fullscreen might not be available in some contexts
+        console.log('Fullscreen not available');
+      });
+    }
+
+    // Handle fullscreen exit
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        onExit();
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    };
+  }, [onExit]);
 
   // Update max scroll when content changes
   useEffect(() => {
@@ -88,6 +115,7 @@ export function FullScreenMode({
 
   return (
     <div
+      ref={containerRef}
       className="h-screen bg-black flex flex-col overflow-hidden"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
