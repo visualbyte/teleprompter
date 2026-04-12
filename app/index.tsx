@@ -250,12 +250,13 @@ export default function EditorScreen() {
 
         {/* Done button — sits just above the keyboard */}
         {isEditing && (
-          <TouchableOpacity
-            style={[styles.doneBtn, { bottom: keyboardHeight + 16 }]}
-            onPress={handleDone}
-          >
-            <Text style={styles.doneBtnText}>Done</Text>
-          </TouchableOpacity>
+          <View style={[styles.doneBtnShadow, { bottom: keyboardHeight + 16 }]}>
+            <TouchableOpacity style={styles.doneBtnClip} onPress={handleDone} activeOpacity={0.8}>
+              <BlurView intensity={20} tint="light" style={styles.doneBtnBlur}>
+                <Text style={styles.doneBtnText}>Done</Text>
+              </BlurView>
+            </TouchableOpacity>
+          </View>
         )}
 
         {/* Controls overlay */}
@@ -394,15 +395,25 @@ const styles = StyleSheet.create({
   },
 
   // Done button (edit mode) — bottom is set dynamically based on keyboard height
-  doneBtn: {
+  doneBtnShadow: {
     position: 'absolute',
     right: 32,
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    borderWidth: 1,
-    borderColor: '#dadada',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.14,
+    shadowRadius: 11,
+    elevation: 5,
+  },
+  doneBtnClip: {
     borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#DADADA',
+  },
+  doneBtnBlur: {
     paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.20)',
   },
   doneBtnText: {
     fontSize: 18,
