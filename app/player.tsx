@@ -50,8 +50,25 @@ export default function PlayerScreen() {
   const scrollYRef = useRef(0);
   const rafRef = useRef<number | null>(null);
 
-  const screenOpacity = useSharedValue(1);
+  const screenOpacity = useSharedValue(0);
+  const fadedIn = useRef(false);
   const fadeStyle = useAnimatedStyle(() => ({ opacity: screenOpacity.value }));
+
+  const countdownScale = useSharedValue(1);
+  const countdownOpacity = useSharedValue(1);
+  const countdownStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: countdownScale.value }],
+    opacity: countdownOpacity.value,
+  }));
+
+  // Each time the countdown number changes, reset and animate out
+  useEffect(() => {
+    if (state !== 'countdown' || countdown === 0) return;
+    countdownScale.value = 1;
+    countdownOpacity.value = 1;
+    countdownScale.value = withTiming(1.6, { duration: 850, easing: Easing.out(Easing.ease) });
+    countdownOpacity.value = withTiming(0, { duration: 850, easing: Easing.out(Easing.ease) });
+  }, [countdown]);
 
   const stopAnimation = useCallback(() => {
     if (rafRef.current !== null) {
@@ -105,6 +122,14 @@ export default function PlayerScreen() {
     return stopAnimation;
   }, [state, contentHeight, scrollViewHeight, speed, stopAnimation]);
 
+  // Fade in the player the first time countdown ends
+  useEffect(() => {
+    if (state === 'playing' && !fadedIn.current) {
+      fadedIn.current = true;
+      screenOpacity.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.ease) });
+    }
+  }, [state]);
+
   // Ended: brief pause → fade to white → go back
   useEffect(() => {
     if (state !== 'ended') return;
@@ -142,7 +167,9 @@ export default function PlayerScreen() {
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#fff" />
         <View style={styles.countdownScreen}>
-          <Text style={styles.countdownNumber}>{countdown}</Text>
+          <Animated.Text style={[styles.countdownNumber, countdownStyle]}>
+          {countdown}
+        </Animated.Text>
         </View>
       </SafeAreaView>
     );

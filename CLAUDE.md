@@ -58,7 +58,7 @@ A teleprompter scrolls a script at a controlled speed so a speaker can read whil
 - `scrollYRef` (plain ref) tracks current scroll position; synced from `onScrollEndDrag` / `onMomentumScrollEnd` after manual drag
 - `onScrollBeginDrag` pauses auto-scroll when user drags; animation resumes from `scrollYRef.current` on next play
 - `READING_LINE = SCREEN_HEIGHT / 2` as static top/bottom padding — places start/end pills at screen center
-- Reanimated used only for fade-out opacity on end (simple, no worklet scroll issues)
+- Reanimated used for: countdown zoom-out animation (scale 1→1.6, opacity 1→0, 850ms), player fade-in on first play (opacity 0→1, 800ms), and fade-to-white on natural end (opacity 1→0, 500ms with 600ms delay)
 
 ## Design
 - White background (`#fff`), green accent `#34c759` for play/selected states
