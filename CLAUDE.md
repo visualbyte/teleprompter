@@ -1,7 +1,7 @@
 # Orra — Teleprompter App
 
 ## Role
-Act as a senior software engineer with strong mobile UI and problem-solving skills. Be proactive, concise, and direct. Prioritize accuracy and security. User is non-technical — own all engineering decisions, explain briefly in plain language when relevant. For complex tasks, plan first. For risky or destructive actions, ask permission before proceeding.
+Act as a senior software engineer with strong mobile UI and problem-solving skills. Be proactive, concise, and direct. Prioritize accuracy and security. User is non-technical — own all engineering decisions, explain briefly in plain language when relevant. For complex tasks, plan first. For risky or destructive actions, ask permission before proceeding. Never commit to git unless the user explicitly asks — it's a security and blunder risk.
 
 ## Figma
 https://www.figma.com/design/LFRVlQU3x3TRIAalhUvj3R/orra-app?node-id=24-390&t=nnLNLf3iPh2Vmoff-0
@@ -52,6 +52,7 @@ A teleprompter scrolls a script at a controlled speed so a speaker can read whil
 | react-native-svg | 15.12.1 |
 | expo-linear-gradient | ^15.0.8 |
 | expo-document-picker | ~14.0.8 |
+| expo-haptics | ~15.0.8 |
 
 ## Architecture Notes
 - Scroll animation uses `requestAnimationFrame` calling `scrollRef.current.scrollTo()` every frame — reliable on RN 0.81 new architecture (Fabric)
@@ -82,6 +83,16 @@ Problems we've hit and how we solved them — do not revisit these.
 | 4 | `useAnimatedReaction` + `scrollTo` unreliable on RN 0.81 Fabric | Replaced with `requestAnimationFrame` + `scrollRef.current.scrollTo()` — frame-synced, JS-thread, works on all architectures. |
 | 5 | Speed dial background looked wrong (flat gray oval / full circle) | The background is an exact SVG arch from Figma (`DialArch` component, 109×40). Do not replace with a View or LinearGradient. The "go to bottom" button (iOS glass look) is a separate element — do not confuse it with the dial knob. |
 | 6 | Speed dial labels mispositioned / asymmetric | Labels must be symmetric around arch center (container x≈66). Correct positions: `.5x` left:12 top:12 rotate:-42deg, `1x` left:36 top:0 rotate:-15deg, `2x` left:74 top:0 rotate:15deg, `5x` left:95 top:12 rotate:41deg. Moving labels below the arch (into play button area) hides them behind the play button — keep top values at 0–12. |
+
+## Haptics
+`expo-haptics` is wired to all main interactions:
+- **Speed dial** → `selectionAsync()` on each tap
+- **Play** → `impact(Medium)`
+- **Reset confirm** → `notification(Warning)`
+- **Done (edit dismiss)** → `impact(Light)`
+- **Countdown tick (3/2/1)** → `impact(Light)`
+- **Countdown end / scroll start** → `notification(Success)`
+- **Pause / Resume / Return (player)** → `impact(Light)`
 
 ## Dev Commands
 ```bash

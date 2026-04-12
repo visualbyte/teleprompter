@@ -23,6 +23,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Toast, useToast } from '../components/Toast';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Haptics from 'expo-haptics';
 import { ArrowDownIcon, ArrowUpIcon, DialArch, FileTrayIcon, OptionsIcon, PlayIcon, ResetIcon } from '../components/icons';
 import { store } from './store';
 
@@ -56,7 +57,7 @@ function SpeedDial({
         return (
           <TouchableOpacity
             key={opt.value}
-            onPress={() => onSpeedChange(opt.value)}
+            onPress={() => { Haptics.selectionAsync(); onSpeedChange(opt.value); }}
             style={[
               styles.dialLabel,
               { left: opt.left, top: opt.top, transform: [{ rotate: opt.rotate }] },
@@ -149,6 +150,7 @@ export default function EditorScreen() {
       : `~${Math.ceil(readTimeSec / 60)} min read time`;
 
   const handlePlay = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     store.setScript(scriptText);
     store.setSpeed(speed);
     router.push('/player');
@@ -160,7 +162,11 @@ export default function EditorScreen() {
       {
         text: 'Reset',
         style: 'destructive',
-        onPress: () => { setScriptText(store.DEFAULT_SCRIPT); show('Script reset to default'); },
+        onPress: () => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          setScriptText(store.DEFAULT_SCRIPT);
+          show('Script reset to default');
+        },
       },
     ]);
   };
@@ -177,6 +183,7 @@ export default function EditorScreen() {
   };
 
   const handleDone = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setIsEditing(false);
   };
 

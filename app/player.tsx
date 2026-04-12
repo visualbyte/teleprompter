@@ -25,6 +25,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PauseIcon, PlayIcon, ReturnIcon } from '../components/icons';
 import { Toast, useToast } from '../components/Toast';
+import * as Haptics from 'expo-haptics';
 import { store } from './store';
 
 type PlayerState = 'countdown' | 'playing' | 'paused' | 'ended';
@@ -67,6 +68,7 @@ export default function PlayerScreen() {
   // Each time the countdown number changes, reset and animate out
   useEffect(() => {
     if (state !== 'countdown' || countdown === 0) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     countdownScale.value = 1;
     countdownOpacity.value = 1;
     countdownScale.value = withTiming(1.6, { duration: 850, easing: Easing.out(Easing.ease) });
@@ -129,6 +131,7 @@ export default function PlayerScreen() {
   useEffect(() => {
     if (state === 'playing' && !fadedIn.current) {
       fadedIn.current = true;
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       screenOpacity.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.ease) });
       show('start reading');
     }
@@ -155,10 +158,12 @@ export default function PlayerScreen() {
 
   const handleTap = () => {
     if (state === 'countdown' || state === 'ended') return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setState(state === 'playing' ? 'paused' : 'playing');
   };
 
   const handleReturn = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     stopAnimation();
     cancelAnimation(screenOpacity);
     router.back();
