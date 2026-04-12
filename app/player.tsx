@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
   NativeScrollEvent,
   NativeSyntheticEvent,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -12,11 +13,8 @@ import {
   View,
 } from 'react-native';
 import Animated, {
-  useAnimatedRef,
   useSharedValue,
   useAnimatedStyle,
-  scrollTo,
-  useAnimatedReaction,
   withTiming,
   withDelay,
   Easing,
@@ -36,8 +34,6 @@ const PAUSE_BTN_SIZE = 80;
 // Half the physical screen height used as top/bottom padding so the
 // start pill and end pill each land at the vertical center (reading line)
 // when scrollY = 0 and scrollY = maxScroll respectively.
-// Using a static Dimensions value avoids a circular layout dependency
-// (scrollViewHeight → halfH → contentHeight → scrollViewHeight …).
 const READING_LINE = SCREEN_HEIGHT / 2;
 
 export default function PlayerScreen() {
@@ -50,19 +46,19 @@ export default function PlayerScreen() {
   const [contentHeight, setContentHeight] = useState(0);
   const [scrollViewHeight, setScrollViewHeight] = useState(0);
 
-  const scrollY = useSharedValue(0);
-  const animScrollRef = useAnimatedRef<Animated.ScrollView>();
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollYRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
 
   const screenOpacity = useSharedValue(1);
   const fadeStyle = useAnimatedStyle(() => ({ opacity: screenOpacity.value }));
 
-  // Mirror scrollY → ScrollView on the UI thread at 60 fps.
-  // onScrollEndDrag / onMomentumScrollEnd sync scrollY after a manual drag
-  // (single event at end of gesture) so there is no feedback loop.
-  useAnimatedReaction(
-    () => scrollY.value,
-    (y) => { scrollTo(animScrollRef, 0, y, false); }
-  );
+  const stopAnimation = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+  }, []);
 
   // Countdown 3 → 2 → 1 → playing
   useEffect(() => {
@@ -76,25 +72,38 @@ export default function PlayerScreen() {
     return () => clearInterval(timer);
   }, [state]);
 
-  // Drive scroll animation. Reads scrollY.value so resuming after a manual
-  // drag picks up from wherever the user left off.
+  // Drive scroll via requestAnimationFrame. Picks up from scrollYRef.current
+  // so resuming after a manual drag starts from wherever the user left off.
   useEffect(() => {
+    stopAnimation();
+
     if (state === 'playing' && contentHeight > 0 && scrollViewHeight > 0) {
       const maxScroll = Math.max(0, contentHeight - scrollViewHeight);
-      const remaining = maxScroll - scrollY.value;
-      if (remaining <= 0) { setState('ended'); return; }
+      if (scrollYRef.current >= maxScroll) { setState('ended'); return; }
 
-      const durationMs = (remaining / (80 * speed)) * 1000;
-      scrollY.value = withTiming(maxScroll, {
-        duration: durationMs,
-        easing: Easing.linear,
-      }, (finished) => {
-        if (finished) runOnJS(setState)('ended');
-      });
-    } else {
-      cancelAnimation(scrollY);
+      const pixelsPerMs = (80 * speed) / 1000;
+      let lastTime: number | null = null;
+
+      const animate = (time: number) => {
+        if (lastTime !== null) {
+          const delta = time - lastTime;
+          scrollYRef.current = Math.min(scrollYRef.current + pixelsPerMs * delta, maxScroll);
+          scrollRef.current?.scrollTo({ y: scrollYRef.current, animated: false });
+
+          if (scrollYRef.current >= maxScroll) {
+            setState('ended');
+            return;
+          }
+        }
+        lastTime = time;
+        rafRef.current = requestAnimationFrame(animate);
+      };
+
+      rafRef.current = requestAnimationFrame(animate);
     }
-  }, [state, contentHeight, scrollViewHeight, speed]);
+
+    return stopAnimation;
+  }, [state, contentHeight, scrollViewHeight, speed, stopAnimation]);
 
   // Ended: brief pause → fade to white → go back
   useEffect(() => {
@@ -113,15 +122,15 @@ export default function PlayerScreen() {
   };
 
   const handleReturn = () => {
-    cancelAnimation(scrollY);
+    stopAnimation();
     cancelAnimation(screenOpacity);
     router.back();
   };
 
-  // After a manual drag while paused, sync scrollY so the animation resumes
-  // from the user's chosen position, not the pre-drag position.
+  // After a manual drag while paused, sync scrollYRef so the animation
+  // resumes from the user's chosen position, not the pre-drag position.
   const handleManualScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    scrollY.value = e.nativeEvent.contentOffset.y;
+    scrollYRef.current = e.nativeEvent.contentOffset.y;
   };
 
   // Countdown — full screen, nothing else visible
@@ -144,14 +153,15 @@ export default function PlayerScreen() {
 
         {/* Scroll content -------------------------------------------------- */}
         <View style={StyleSheet.absoluteFill}>
-          <Animated.ScrollView
-            ref={animScrollRef}
-            scrollEnabled={state === 'paused'}
+          <ScrollView
+            ref={scrollRef}
+            scrollEnabled={true}
             showsVerticalScrollIndicator={false}
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             onContentSizeChange={(_, h) => setContentHeight(h)}
             onLayout={(e) => setScrollViewHeight(e.nativeEvent.layout.height)}
+            onScrollBeginDrag={() => { if (state === 'playing') setState('paused'); }}
             onScrollEndDrag={handleManualScrollEnd}
             onMomentumScrollEnd={handleManualScrollEnd}
           >
@@ -164,7 +174,7 @@ export default function PlayerScreen() {
             <View style={styles.endPill}>
               <Text style={styles.endPillText}>end of the script...</Text>
             </View>
-          </Animated.ScrollView>
+          </ScrollView>
 
           <LinearGradient
             colors={['#ffffff', 'rgba(255,255,255,0)']}
@@ -235,7 +245,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     // READING_LINE (= SCREEN_HEIGHT / 2) as top/bottom padding places the
     // start pill at the screen centre when scrollY=0 and the end pill at
-    // the screen centre when scrollY=maxScroll. Static value — no re-render loop.
+    // the screen centre when scrollY=maxScroll.
     paddingTop: READING_LINE,
     paddingBottom: READING_LINE,
   },
