@@ -68,6 +68,7 @@ A teleprompter scrolls a script at a controlled speed so a speaker can read whil
 - Speed dial arc at bottom center (134×134 container), play button 80px circle
 - Speed dial background is a custom SVG arch (`DialArch` in icons.tsx) — 109×40, fill `#F4F4F4`, positioned at `left: 12` in the 134px container to center it. Labels (.5x / 1x / 2x / 5x) arc along the top of the arch, symmetric around arch center (container x≈66). Do not use a plain View or gradient for the dial background.
 - Top/bottom scrims via `expo-linear-gradient`
+- App bar crossfade: single `Animated.Value` (0→1, 500ms). "Orra." + import fade out over first 200ms, 100ms empty gap, "Edit." fades in over last 200ms. Reverses on dismiss. Two `Animated.View` layers with `absoluteFill` + `pointerEvents` toggled.
 - Scroll buttons: glass pill (48×48, borderRadius 24), `expo-blur` BlurView (intensity 20, tint light), `rgba(255,255,255,0.20)` bg, `1px solid #DADADA` border, layered shadow. Go-to-top appears at `top: 16` when scrollY > 80; go-to-bottom at `bottom: 165` when more than 80px from end. Arrow SVGs from Figma.
 
 ## Decisions & Solutions Log
