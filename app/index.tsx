@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
   Dimensions,
   Keyboard,
   KeyboardEvent,
@@ -94,6 +95,7 @@ export default function EditorScreen() {
   const [isEditing, setIsEditing] = useState(false);
 
   const { toast, show } = useToast();
+  const appBarAnim = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
   const [scrollY, setScrollY] = useState(0);
   const [scrollContentH, setScrollContentH] = useState(0);
@@ -105,6 +107,15 @@ export default function EditorScreen() {
   const handleScrollToTop = () => scrollRef.current?.scrollTo({ y: 0, animated: true });
   const handleScrollToBottom = () => scrollRef.current?.scrollToEnd({ animated: true });
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Crossfade app bar between view and edit mode
+  useEffect(() => {
+    Animated.timing(appBarAnim, {
+      toValue: isEditing ? 1 : 0,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  }, [isEditing]);
 
   // Show "That's a wrap" when returning from a completed run
   useFocusEffect(
@@ -176,12 +187,24 @@ export default function EditorScreen() {
 
       {/* App Bar */}
       <View style={styles.appBar}>
-        <Text style={styles.appBarTitle}>{isEditing ? 'Edit.' : 'Orra.'}</Text>
-        {!isEditing && (
+        {/* View mode: "Orra." + import — fades out on edit */}
+        <Animated.View
+          style={[StyleSheet.absoluteFill, styles.appBarRow, { opacity: appBarAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [1, 0, 0] }) }]}
+          pointerEvents={isEditing ? 'none' : 'auto'}
+        >
+          <Text style={styles.appBarTitle}>Orra.</Text>
           <TouchableOpacity style={styles.appBarIcon} onPress={handleImport}>
             <FileTrayIcon size={32} color="#333" />
           </TouchableOpacity>
-        )}
+        </Animated.View>
+
+        {/* Edit mode: "Edit." — fades in on edit */}
+        <Animated.View
+          style={[StyleSheet.absoluteFill, styles.appBarRow, { opacity: appBarAnim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0, 1] }) }]}
+          pointerEvents={isEditing ? 'auto' : 'none'}
+        >
+          <Text style={styles.appBarTitle}>Edit.</Text>
+        </Animated.View>
       </View>
 
       {/* Script content */}
@@ -305,6 +328,8 @@ const styles = StyleSheet.create({
   // App bar
   appBar: {
     height: 80,
+  },
+  appBarRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
