@@ -1,0 +1,6 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="file-tray-outline 2">
+<path id="Vector" d="M24 5H8C6.375 5 5.3125 5.875 5 7.5L3 17V24C3.00231 24.7949 3.31912 25.5567 3.88123 26.1188C4.44334 26.6809 5.20506 26.9977 6 27H26C26.7949 26.9977 27.5567 26.6809 28.1188 26.1188C28.6809 25.5567 28.9977 24.7949 29 24V17L27 7.5C26.6875 5.8125 25.5625 5 24 5Z" stroke="var(--stroke-0, #333333)" stroke-width="3" stroke-linejoin="round"/>
+<path id="Vector_2" d="M3 17H12C12 18.0609 12.4214 19.0783 13.1716 19.8284C13.9217 20.5786 14.9391 21 16 21C17.0609 21 18.0783 20.5786 18.8284 19.8284C19.5786 19.0783 20 18.0609 20 17H29" stroke="var(--stroke-0, #333333)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

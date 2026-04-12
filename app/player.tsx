@@ -1,256 +1,318 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
+  Dimensions,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   SafeAreaView,
   StatusBar,
-  TouchableOpacity,
-  Dimensions,
-  ScrollView,
   StyleSheet,
+  Text,
+  TouchableWithoutFeedback,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import Animated, {
+  useAnimatedRef,
+  useSharedValue,
+  useAnimatedStyle,
+  scrollTo,
+  useAnimatedReaction,
+  withTiming,
+  withDelay,
+  Easing,
+  cancelAnimation,
+  runOnJS,
+} from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { PauseIcon, PlayIcon, ReturnIcon } from '../components/icons';
+import { store } from './store';
 
 type PlayerState = 'countdown' | 'playing' | 'paused' | 'ended';
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const PAUSE_BTN_SIZE = 80;
+
+// Half the physical screen height used as top/bottom padding so the
+// start pill and end pill each land at the vertical center (reading line)
+// when scrollY = 0 and scrollY = maxScroll respectively.
+// Using a static Dimensions value avoids a circular layout dependency
+// (scrollViewHeight → halfH → contentHeight → scrollViewHeight …).
+const READING_LINE = SCREEN_HEIGHT / 2;
+
 export default function PlayerScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const text = (params.text as string) || '';
-  const speed = parseFloat((params.speed as string) || '1');
+  const text = store.getScript();
+  const speed = store.getSpeed();
 
   const [state, setState] = useState<PlayerState>('countdown');
-  const [countdownValue, setCountdownValue] = useState(3);
-  const scrollViewRef = useRef<ScrollView>(null);
-  const scrollPosRef = useRef(0);
-  const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const contentHeightRef = useRef(0);
+  const [countdown, setCountdown] = useState(3);
+  const [contentHeight, setContentHeight] = useState(0);
+  const [scrollViewHeight, setScrollViewHeight] = useState(0);
 
-  // Countdown logic
+  const scrollY = useSharedValue(0);
+  const animScrollRef = useAnimatedRef<Animated.ScrollView>();
+
+  const screenOpacity = useSharedValue(1);
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: screenOpacity.value }));
+
+  // Mirror scrollY → ScrollView on the UI thread at 60 fps.
+  // onScrollEndDrag / onMomentumScrollEnd sync scrollY after a manual drag
+  // (single event at end of gesture) so there is no feedback loop.
+  useAnimatedReaction(
+    () => scrollY.value,
+    (y) => { scrollTo(animScrollRef, 0, y, false); }
+  );
+
+  // Countdown 3 → 2 → 1 → playing
   useEffect(() => {
     if (state !== 'countdown') return;
-
     const timer = setInterval(() => {
-      setCountdownValue((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setState('playing');
-          return 0;
-        }
+      setCountdown((prev) => {
+        if (prev <= 1) { clearInterval(timer); setState('playing'); return 0; }
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(timer);
   }, [state]);
 
-  // Auto-scroll logic
+  // Drive scroll animation. Reads scrollY.value so resuming after a manual
+  // drag picks up from wherever the user left off.
   useEffect(() => {
-    if (state === 'playing') {
-      // Start scrolling: ~80 pixels per second at 1x speed
-      const scrollSpeed = 80 * speed;
-      const updateInterval = 50; // ms
+    if (state === 'playing' && contentHeight > 0 && scrollViewHeight > 0) {
+      const maxScroll = Math.max(0, contentHeight - scrollViewHeight);
+      const remaining = maxScroll - scrollY.value;
+      if (remaining <= 0) { setState('ended'); return; }
 
-      scrollIntervalRef.current = setInterval(() => {
-        const increment = (scrollSpeed * updateInterval) / 1000;
-        scrollPosRef.current += increment;
-
-        if (scrollViewRef.current) {
-          scrollViewRef.current.scrollTo({
-            y: scrollPosRef.current,
-            animated: false,
-          });
-        }
-      }, updateInterval);
+      const durationMs = (remaining / (80 * speed)) * 1000;
+      scrollY.value = withTiming(maxScroll, {
+        duration: durationMs,
+        easing: Easing.linear,
+      }, (finished) => {
+        if (finished) runOnJS(setState)('ended');
+      });
     } else {
-      if (scrollIntervalRef.current) {
-        clearInterval(scrollIntervalRef.current);
-      }
+      cancelAnimation(scrollY);
     }
+  }, [state, contentHeight, scrollViewHeight, speed]);
 
-    return () => {
-      if (scrollIntervalRef.current) {
-        clearInterval(scrollIntervalRef.current);
-      }
-    };
-  }, [state, speed]);
+  // Ended: brief pause → fade to white → go back
+  useEffect(() => {
+    if (state !== 'ended') return;
+    screenOpacity.value = withDelay(
+      600,
+      withTiming(0, { duration: 500, easing: Easing.out(Easing.ease) }, (finished) => {
+        if (finished) runOnJS(router.back)();
+      })
+    );
+  }, [state]);
 
-  const handlePlayPause = () => {
-    setState((prev) => (prev === 'playing' ? 'paused' : 'playing'));
+  const handleTap = () => {
+    if (state === 'countdown' || state === 'ended') return;
+    setState(state === 'playing' ? 'paused' : 'playing');
   };
 
   const handleReturn = () => {
-    if (scrollIntervalRef.current) {
-      clearInterval(scrollIntervalRef.current);
-    }
-    scrollPosRef.current = 0;
+    cancelAnimation(scrollY);
+    cancelAnimation(screenOpacity);
     router.back();
   };
 
+  // After a manual drag while paused, sync scrollY so the animation resumes
+  // from the user's chosen position, not the pre-drag position.
+  const handleManualScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollY.value = e.nativeEvent.contentOffset.y;
+  };
+
+  // Countdown — full screen, nothing else visible
+  if (state === 'countdown') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+        <View style={styles.countdownScreen}>
+          <Text style={styles.countdownNumber}>{countdown}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
-      {/* App Bar */}
-      <View
-        style={{
-          height: 154,
-          justifyContent: 'flex-end',
-          paddingHorizontal: 32,
-          paddingBottom: 16,
-          backgroundColor: '#000',
-        }}
-      >
-        <Text style={{ fontSize: 34, fontWeight: '500', color: '#fff' }}>
-          teleprompter
-        </Text>
-      </View>
+      <Animated.View style={[styles.fadeView, fadeStyle]}>
 
-      {/* Top Scrim */}
-      <LinearGradient
-        colors={['rgba(0,0,0,1)', 'rgba(0,0,0,0)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={{
-          position: 'absolute',
-          top: 154,
-          left: 0,
-          right: 0,
-          height: 154,
-          zIndex: 10,
-        }}
-      />
-
-      {/* Countdown Overlay */}
-      {state === 'countdown' && (
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              justifyContent: 'center',
-              alignItems: 'center',
-              backgroundColor: 'rgba(0,0,0,0.95)',
-              zIndex: 100,
-            },
-          ]}
-        >
-          <Text
-            style={{
-              fontSize: 120,
-              fontWeight: '700',
-              color: '#fff',
-            }}
+        {/* Scroll content -------------------------------------------------- */}
+        <View style={StyleSheet.absoluteFill}>
+          <Animated.ScrollView
+            ref={animScrollRef}
+            scrollEnabled={state === 'paused'}
+            showsVerticalScrollIndicator={false}
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            onContentSizeChange={(_, h) => setContentHeight(h)}
+            onLayout={(e) => setScrollViewHeight(e.nativeEvent.layout.height)}
+            onScrollEndDrag={handleManualScrollEnd}
+            onMomentumScrollEnd={handleManualScrollEnd}
           >
-            {countdownValue}
-          </Text>
+            <View style={styles.startPill}>
+              <Text style={styles.startPillText}>start reading</Text>
+            </View>
+
+            <Text style={styles.scriptText}>{text}</Text>
+
+            <View style={styles.endPill}>
+              <Text style={styles.endPillText}>end of the script...</Text>
+            </View>
+          </Animated.ScrollView>
+
+          <LinearGradient
+            colors={['#ffffff', 'rgba(255,255,255,0)']}
+            style={styles.topScrim}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['rgba(255,255,255,0)', '#ffffff']}
+            style={styles.bottomScrim}
+            pointerEvents="none"
+          />
         </View>
-      )}
 
-      {/* Script Text */}
-      <ScrollView
-        ref={scrollViewRef}
-        scrollEnabled={false}
-        showsVerticalScrollIndicator={false}
-        style={{
-          flex: 1,
-          paddingHorizontal: 32,
-          paddingTop: 100,
-          paddingBottom: 160,
-          backgroundColor: '#000',
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 48,
-            fontWeight: '600',
-            color: '#fff',
-            lineHeight: 56,
-          }}
-        >
-          {text}
-        </Text>
-        <View
-          style={{
-            backgroundColor: '#333',
-            borderRadius: 40,
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            alignSelf: 'center',
-            marginTop: 24,
-            marginBottom: 32,
-          }}
-        >
-          <Text style={{ color: '#888', fontSize: 16, fontWeight: '600' }}>
-            end of the script...
-          </Text>
-        </View>
-      </ScrollView>
+        {/* Tap-to-pause overlay — only while playing so manual scroll works while paused */}
+        {state === 'playing' && (
+          <TouchableWithoutFeedback onPress={handleTap}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
+        )}
 
-      {/* Bottom Scrim */}
-      <LinearGradient
-        colors={['rgba(0,0,0,0)', 'rgba(0,0,0,1)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: 221,
-          zIndex: 10,
-        }}
-      />
+        {/* Return button */}
+        <TouchableOpacity style={styles.returnBtn} onPress={handleReturn}>
+          <ReturnIcon size={32} color="#000" />
+        </TouchableOpacity>
 
-      {/* Bottom Controls */}
-      {state !== 'countdown' && (
-        <View
-          style={{
-            position: 'absolute',
-            bottom: 40,
-            left: 0,
-            right: 0,
-            height: 80,
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            paddingHorizontal: 32,
-          }}
-        >
-          {/* Return Button */}
-          <TouchableOpacity
-            onPress={handleReturn}
-            style={{
-              width: 32,
-              height: 32,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ fontSize: 24, color: '#fff' }}>←</Text>
-          </TouchableOpacity>
+        {/* Pause / Play — always tappable for both pause and resume */}
+        <TouchableOpacity style={styles.pauseBtn} onPress={handleTap}>
+          <View style={[
+            styles.pauseBtnCircle,
+            state === 'paused' ? styles.pauseCircleGreen : styles.pauseCircleRed,
+          ]}>
+            {state === 'paused'
+              ? <PlayIcon size={32} color="#fff" />
+              : <PauseIcon size={32} color="#fff" />}
+          </View>
+        </TouchableOpacity>
 
-          {/* Play/Pause Button */}
-          <TouchableOpacity
-            onPress={handlePlayPause}
-            style={{
-              width: 80,
-              height: 80,
-              borderRadius: 40,
-              backgroundColor: state === 'playing' ? '#ff4444' : '#34c759',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <Text style={{ fontSize: 32, color: '#fff' }}>
-              {state === 'playing' ? '||' : '▶'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Spacer */}
-          <View style={{ width: 32, height: 32 }} />
-        </View>
-      )}
+      </Animated.View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+
+  fadeView: {
+    flex: 1,
+  },
+
+  countdownScreen: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  countdownNumber: {
+    fontSize: 200,
+    fontWeight: '700',
+    color: '#333',
+  },
+
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 32,
+    // READING_LINE (= SCREEN_HEIGHT / 2) as top/bottom padding places the
+    // start pill at the screen centre when scrollY=0 and the end pill at
+    // the screen centre when scrollY=maxScroll. Static value — no re-render loop.
+    paddingTop: READING_LINE,
+    paddingBottom: READING_LINE,
+  },
+
+  startPill: {
+    alignSelf: 'center',
+    backgroundColor: '#f6f6f6',
+    borderRadius: 40,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginBottom: 180,
+  },
+  startPillText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#34c759',
+  },
+
+  scriptText: {
+    fontSize: 48,
+    fontWeight: '600',
+    color: '#000',
+    lineHeight: 56,
+  },
+
+  endPill: {
+    alignSelf: 'center',
+    backgroundColor: '#f6f6f6',
+    borderRadius: 40,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginTop: 180,
+  },
+  endPillText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#c56464',
+  },
+
+  topScrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 154,
+  },
+  bottomScrim: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 410,
+  },
+
+  returnBtn: {
+    position: 'absolute',
+    bottom: 45,
+    left: 54,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  pauseBtn: {
+    position: 'absolute',
+    bottom: 21,
+    left: (SCREEN_WIDTH - PAUSE_BTN_SIZE) / 2,
+    width: PAUSE_BTN_SIZE,
+    height: PAUSE_BTN_SIZE,
+  },
+  pauseBtnCircle: {
+    flex: 1,
+    borderRadius: PAUSE_BTN_SIZE / 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pauseCircleRed: { backgroundColor: '#ff3b30' },
+  pauseCircleGreen: { backgroundColor: '#34c759' },
+});
