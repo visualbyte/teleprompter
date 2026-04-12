@@ -37,7 +37,7 @@ A teleprompter scrolls a script at a controlled speed so a speaker can read whil
 
 **State:** `app/store.ts` — module-level store (no Redux/Zustand). Passes script text and speed between screens. URL params were abandoned due to text length cutoff.
 
-**Icons:** Custom SVG components in `components/icons.tsx` (Play, Pause, Return, Reset, Options, FileTray, DialArch).
+**Icons:** Custom SVG components in `components/icons.tsx` (Play, Pause, Return, Reset, Options, FileTray, DialArch, ArrowUpIcon, ArrowDownIcon).
 
 **Toast:** `components/Toast.tsx` — `useToast` hook + `Toast` component. Pill-shaped, white bg, subtle shadow, centered on screen, fade + scale animation. Font 18px bold, padding 28×16. Three triggers: script reset → "Script reset to default", file import → "Script imported", completed run → "That's a wrap". Completed-run signal lives in `store.ts` as `setCompletedRun` / `takeCompletedRun` (reads-and-clears). Player calls `setCompletedRun` only in the natural-end `finished` callback, not on manual return. Editor checks via `useFocusEffect`.
 
@@ -68,6 +68,7 @@ A teleprompter scrolls a script at a controlled speed so a speaker can read whil
 - Speed dial arc at bottom center (134×134 container), play button 80px circle
 - Speed dial background is a custom SVG arch (`DialArch` in icons.tsx) — 109×40, fill `#F4F4F4`, positioned at `left: 12` in the 134px container to center it. Labels (.5x / 1x / 2x / 5x) arc along the top of the arch, symmetric around arch center (container x≈66). Do not use a plain View or gradient for the dial background.
 - Top/bottom scrims via `expo-linear-gradient`
+- Scroll buttons: glass pill (48×48, borderRadius 24), `expo-blur` BlurView (intensity 20, tint light), `rgba(255,255,255,0.20)` bg, `1px solid #DADADA` border, layered shadow. Go-to-top appears at `top: 16` when scrollY > 80; go-to-bottom at `bottom: 165` when more than 80px from end. Arrow SVGs from Figma.
 
 ## Decisions & Solutions Log
 Problems we've hit and how we solved them — do not revisit these.

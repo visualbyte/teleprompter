@@ -4,6 +4,8 @@ import {
   Dimensions,
   Keyboard,
   KeyboardEvent,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -14,12 +16,13 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Toast, useToast } from '../components/Toast';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
-import { DialArch, FileTrayIcon, OptionsIcon, PlayIcon, ResetIcon } from '../components/icons';
+import { ArrowDownIcon, ArrowUpIcon, DialArch, FileTrayIcon, OptionsIcon, PlayIcon, ResetIcon } from '../components/icons';
 import { store } from './store';
 
 type ScrollSpeed = 0.5 | 1 | 2 | 5;
@@ -71,6 +74,18 @@ function SpeedDial({
   );
 }
 
+function ScrollButton({ onPress, children, style }: { onPress: () => void; children: React.ReactNode; style: object }) {
+  return (
+    <View style={[styles.scrollBtnShadow, style]}>
+      <TouchableOpacity onPress={onPress} style={styles.scrollBtnClip} activeOpacity={0.8}>
+        <BlurView intensity={20} tint="light" style={styles.scrollBtnBlur}>
+          {children}
+        </BlurView>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function EditorScreen() {
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
@@ -80,6 +95,15 @@ export default function EditorScreen() {
 
   const { toast, show } = useToast();
   const insets = useSafeAreaInsets();
+  const [scrollY, setScrollY] = useState(0);
+  const [scrollContentH, setScrollContentH] = useState(0);
+  const [scrollViewH, setScrollViewH] = useState(0);
+
+  const showGoToTop = !isEditing && scrollY > 80;
+  const showGoToBottom = !isEditing && scrollContentH - scrollViewH - scrollY > 80;
+
+  const handleScrollToTop = () => scrollRef.current?.scrollTo({ y: 0, animated: true });
+  const handleScrollToBottom = () => scrollRef.current?.scrollToEnd({ animated: true });
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // Show "That's a wrap" when returning from a completed run
@@ -145,10 +169,6 @@ export default function EditorScreen() {
     setIsEditing(false);
   };
 
-  const handleScrollToBottom = () => {
-    scrollRef.current?.scrollToEnd({ animated: true });
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
@@ -178,6 +198,11 @@ export default function EditorScreen() {
           ]}
           keyboardShouldPersistTaps="handled"
           scrollEventThrottle={16}
+          onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) =>
+            setScrollY(e.nativeEvent.contentOffset.y)
+          }
+          onContentSizeChange={(_, h) => setScrollContentH(h)}
+          onLayout={(e) => setScrollViewH(e.nativeEvent.layout.height)}
         >
           {isEditing ? (
             <TextInput
@@ -209,11 +234,18 @@ export default function EditorScreen() {
           pointerEvents="none"
         />
 
-        {/* Go-bottom button — above scrim */}
-        {!isEditing && (
-          <TouchableOpacity style={styles.goBottomBtn} onPress={handleScrollToBottom}>
-            <Text style={styles.goBottomText}>↓</Text>
-          </TouchableOpacity>
+        {/* Go-to-top button */}
+        {showGoToTop && (
+          <ScrollButton onPress={handleScrollToTop} style={styles.goTopBtn}>
+            <ArrowUpIcon />
+          </ScrollButton>
+        )}
+
+        {/* Go-to-bottom button */}
+        {showGoToBottom && (
+          <ScrollButton onPress={handleScrollToBottom} style={styles.goBottomBtn}>
+            <ArrowDownIcon />
+          </ScrollButton>
         )}
 
         {/* Done button — sits just above the keyboard */}
@@ -330,22 +362,35 @@ const styles = StyleSheet.create({
     pointerEvents: 'none',
   },
 
-  // Go-bottom button
-  goBottomBtn: {
+  // Scroll buttons (go-to-top / go-to-bottom)
+  scrollBtnShadow: {
     position: 'absolute',
-    bottom: 165,
     alignSelf: 'center',
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    borderWidth: 1,
-    borderColor: '#dadada',
-    borderRadius: 24,
-    paddingHorizontal: 24,
-    paddingVertical: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.14,
+    shadowRadius: 11,
+    elevation: 5,
   },
-  goBottomText: {
-    fontSize: 16,
-    color: '#383838',
-    fontWeight: '600',
+  scrollBtnClip: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#DADADA',
+  },
+  scrollBtnBlur: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.20)',
+  },
+  goTopBtn: {
+    top: 16,
+  },
+  goBottomBtn: {
+    bottom: 165,
   },
 
   // Done button (edit mode) — bottom is set dynamically based on keyboard height
