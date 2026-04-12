@@ -111,7 +111,10 @@ export default function PlayerScreen() {
     screenOpacity.value = withDelay(
       600,
       withTiming(0, { duration: 500, easing: Easing.out(Easing.ease) }, (finished) => {
-        if (finished) runOnJS(router.back)();
+        if (finished) {
+          runOnJS(store.setCompletedRun)();
+          runOnJS(router.back)();
+        }
       })
     );
   }, [state]);

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Dimensions,
@@ -15,10 +15,11 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Toast, useToast } from '../components/Toast';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
-import { FileTrayIcon, OptionsIcon, PlayIcon, ResetIcon } from '../components/icons';
+import { DialArch, FileTrayIcon, OptionsIcon, PlayIcon, ResetIcon } from '../components/icons';
 import { store } from './store';
 
 type ScrollSpeed = 0.5 | 1 | 2 | 5;
@@ -29,8 +30,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SPEED_OPTIONS: { value: ScrollSpeed; label: string; left: number; top: number; rotate: string }[] = [
   { value: 0.5, label: '.5x', left: 12, top: 12, rotate: '-42deg' },
   { value: 1,   label: '1x',  left: 36, top: 0,  rotate: '-15deg' },
-  { value: 2,   label: '2x',  left: 67, top: 1,  rotate: '15deg'  },
-  { value: 5,   label: '5x',  left: 92, top: 11, rotate: '41deg'  },
+  { value: 2,   label: '2x',  left: 74, top: 0,  rotate: '15deg'  },
+  { value: 5,   label: '5x',  left: 95, top: 12, rotate: '41deg'  },
 ];
 
 function SpeedDial({
@@ -42,8 +43,10 @@ function SpeedDial({
 }) {
   return (
     <View style={styles.dialContainer}>
-      {/* knob background — simple circle, matches Figma silver dial */}
-      <View style={styles.dialBg} />
+      {/* arch background */}
+      <View style={styles.dialBg}>
+        <DialArch />
+      </View>
       {SPEED_OPTIONS.map((opt) => {
         const selected = speed === opt.value;
         return (
@@ -75,8 +78,16 @@ export default function EditorScreen() {
   const [scriptText, setScriptText] = useState(store.DEFAULT_SCRIPT);
   const [isEditing, setIsEditing] = useState(false);
 
+  const { toast, show } = useToast();
   const insets = useSafeAreaInsets();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Show "That's a wrap" when returning from a completed run
+  useFocusEffect(
+    useCallback(() => {
+      if (store.takeCompletedRun()) show("That's a wrap");
+    }, [])
+  );
 
   useEffect(() => {
     const show = Keyboard.addListener('keyboardWillShow', (e: KeyboardEvent) => {
@@ -114,7 +125,7 @@ export default function EditorScreen() {
       {
         text: 'Reset',
         style: 'destructive',
-        onPress: () => setScriptText(store.DEFAULT_SCRIPT),
+        onPress: () => { setScriptText(store.DEFAULT_SCRIPT); show('Script reset to default'); },
       },
     ]);
   };
@@ -127,7 +138,7 @@ export default function EditorScreen() {
     if (result.canceled) return;
     const uri = result.assets[0].uri;
     const text = await fetch(uri).then((r) => r.text());
-    if (text.trim()) setScriptText(text.trim());
+    if (text.trim()) { setScriptText(text.trim()); show('Script imported'); }
   };
 
   const handleDone = () => {
@@ -141,6 +152,7 @@ export default function EditorScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <Toast message={toast.message} id={toast.id} />
 
       {/* App Bar */}
       <View style={styles.appBar}>
@@ -374,12 +386,8 @@ const styles = StyleSheet.create({
   },
   dialBg: {
     position: 'absolute',
-    left: 12,
-    right: 12,
+    left: 12,  // (134 - 109) / 2 = 12.5 → centres the 109px arch in the 134px container
     top: 0,
-    height: 68,
-    borderRadius: 60,
-    backgroundColor: '#e0e0e0',
   },
   dialLabel: {
     position: 'absolute',

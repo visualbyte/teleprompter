@@ -6,15 +6,16 @@ const DEFAULT_SCRIPT =
 
 let _scriptText = DEFAULT_SCRIPT;
 let _speed = 1;
+let _completedRun = false;
 
 export const store = {
   getScript: () => _scriptText,
-  setScript: (text: string) => {
-    _scriptText = text;
-  },
+  setScript: (text: string) => { _scriptText = text; },
   getSpeed: () => _speed,
-  setSpeed: (speed: number) => {
-    _speed = speed;
-  },
+  setSpeed: (speed: number) => { _speed = speed; },
+  // Called by player on natural end (not manual return).
+  // takeCompletedRun reads and clears in one shot so the editor only fires once.
+  setCompletedRun: () => { _completedRun = true; },
+  takeCompletedRun: () => { const v = _completedRun; _completedRun = false; return v; },
   DEFAULT_SCRIPT,
 };
