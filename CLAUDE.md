@@ -59,6 +59,8 @@ A teleprompter scrolls a script at a controlled speed so a speaker can read whil
 - `onScrollBeginDrag` pauses auto-scroll when user drags; animation resumes from `scrollYRef.current` on next play
 - `READING_LINE = SCREEN_HEIGHT / 2` as static top/bottom padding — places start/end pills at screen center
 - Reanimated used for: countdown zoom-out animation (scale 1→1.6, opacity 1→0, 850ms), player fade-in on first play (opacity 0→1, 800ms), and fade-to-white on natural end (opacity 1→0, 500ms with 600ms delay)
+- Scroll content: `paddingTop: READING_LINE + 96` (text starts 96px below reading line), `paddingBottom: READING_LINE + 180` (restores end runway lost when start/end pills were removed)
+- Start and end pills removed — replaced by toasts: "start reading" on first play, "fin." on natural end. Toast shadow: opacity 0.18, radius 20, offset 6, elevation 10.
 
 ## Design
 - White background (`#fff`), green accent `#34c759` for play/selected states

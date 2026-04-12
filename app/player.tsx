@@ -24,6 +24,7 @@ import Animated, {
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PauseIcon, PlayIcon, ReturnIcon } from '../components/icons';
+import { Toast, useToast } from '../components/Toast';
 import { store } from './store';
 
 type PlayerState = 'countdown' | 'playing' | 'paused' | 'ended';
@@ -49,6 +50,8 @@ export default function PlayerScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const scrollYRef = useRef(0);
   const rafRef = useRef<number | null>(null);
+
+  const { toast, show } = useToast();
 
   const screenOpacity = useSharedValue(0);
   const fadedIn = useRef(false);
@@ -122,12 +125,18 @@ export default function PlayerScreen() {
     return stopAnimation;
   }, [state, contentHeight, scrollViewHeight, speed, stopAnimation]);
 
-  // Fade in the player the first time countdown ends
+  // Fade in the player the first time countdown ends, show start toast
   useEffect(() => {
     if (state === 'playing' && !fadedIn.current) {
       fadedIn.current = true;
       screenOpacity.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.ease) });
+      show('start reading');
     }
+  }, [state]);
+
+  // Show end toast when script finishes
+  useEffect(() => {
+    if (state === 'ended') show('fin.');
   }, [state]);
 
   // Ended: brief pause → fade to white → go back
@@ -178,6 +187,7 @@ export default function PlayerScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <Toast message={toast.message} id={toast.id} />
 
       <Animated.View style={[styles.fadeView, fadeStyle]}>
 
@@ -195,15 +205,7 @@ export default function PlayerScreen() {
             onScrollEndDrag={handleManualScrollEnd}
             onMomentumScrollEnd={handleManualScrollEnd}
           >
-            <View style={styles.startPill}>
-              <Text style={styles.startPillText}>start reading</Text>
-            </View>
-
             <Text style={styles.scriptText}>{text}</Text>
-
-            <View style={styles.endPill}>
-              <Text style={styles.endPillText}>end of the script...</Text>
-            </View>
           </ScrollView>
 
           <LinearGradient
@@ -276,22 +278,8 @@ const styles = StyleSheet.create({
     // READING_LINE (= SCREEN_HEIGHT / 2) as top/bottom padding places the
     // start pill at the screen centre when scrollY=0 and the end pill at
     // the screen centre when scrollY=maxScroll.
-    paddingTop: READING_LINE,
-    paddingBottom: READING_LINE,
-  },
-
-  startPill: {
-    alignSelf: 'center',
-    backgroundColor: '#f6f6f6',
-    borderRadius: 40,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginBottom: 180,
-  },
-  startPillText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#34c759',
+    paddingTop: READING_LINE + 96,
+    paddingBottom: READING_LINE + 180,
   },
 
   scriptText: {
@@ -299,20 +287,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000',
     lineHeight: 56,
-  },
-
-  endPill: {
-    alignSelf: 'center',
-    backgroundColor: '#f6f6f6',
-    borderRadius: 40,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginTop: 180,
-  },
-  endPillText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#c56464',
   },
 
   topScrim: {
