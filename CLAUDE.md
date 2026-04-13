@@ -23,7 +23,7 @@ A teleprompter scrolls a script at a controlled speed so a speaker can read whil
 - **Speed dial** (bottom center arc) → select scroll speed: 0.5x / 1x / 2x / 5x
 - **Play button** (bottom center circle, green) → saves script + speed to store, navigates to player
 - **Reset button** (bottom right) → confirmation alert, resets script to default
-- **Options button** (bottom left) → not yet implemented
+- **Options button** (bottom left) → opens floating glass context menu
 - Read time estimate shown at the bottom (e.g. "~2 min read time") based on 140 wpm
 
 ## Player Screen UX (intended behaviour)
@@ -42,7 +42,7 @@ A teleprompter scrolls a script at a controlled speed so a speaker can read whil
 - `app/player.tsx` — Player: 3-2-1 countdown, requestAnimationFrame scroll, tap to pause/resume, fade-to-white on end
 - `app/_layout.tsx` — Stack navigator, no headers, player has no transition animation
 
-**State:** `app/store.ts` — module-level store (no Redux/Zustand). Passes script text and speed between screens. URL params were abandoned due to text length cutoff.
+**State:** `app/store.ts` — module-level store (no Redux/Zustand). Passes script text, speed, and dark mode between screens. URL params were abandoned due to text length cutoff.
 
 **Icons:** Custom SVG components in `components/icons.tsx` (Play, Pause, Return, Reset, Options, FileTray, DialArch, ArrowUpIcon, ArrowDownIcon).
 
@@ -76,10 +76,13 @@ A teleprompter scrolls a script at a controlled speed so a speaker can read whil
 - White background (`#fff`), green accent `#34c759` for play/selected states
 - Script text: 48px bold, lineHeight 56
 - Speed dial arc at bottom center (134×134 container), play button 80px circle
-- Speed dial background is a custom SVG arch (`DialArch` in icons.tsx) — 109×40, fill `#F4F4F4`, positioned at `left: 12` in the 134px container to center it. Labels (.5x / 1x / 2x / 5x) arc along the top of the arch, symmetric around arch center (container x≈66). Do not use a plain View or gradient for the dial background.
-- Top/bottom scrims via `expo-linear-gradient`
+- Speed dial background is a custom SVG arch (`DialArch` in icons.tsx) — 109×40, fill `#F4F4F4` (dark: `#2C2C2E`), positioned at `left: 12` in the 134px container to center it. Labels (.5x / 1x / 2x / 5x) arc along the top of the arch, symmetric around arch center (container x≈66). Do not use a plain View or gradient for the dial background.
+- Top/bottom scrims via `expo-linear-gradient`. The transparent end of a scrim gradient MUST use matching-RGB transparent (e.g. `rgba(255,255,255,0)` with white, `rgba(0,0,0,0)` with black) — mismatched RGB channels produce muddy gray midpoints.
 - App bar crossfade: single `Animated.Value` (0→1, 500ms). "Orra." + import fade out over first 200ms, 100ms empty gap, "Edit." fades in over last 200ms. Reverses on dismiss. Two `Animated.View` layers with `absoluteFill` + `pointerEvents` toggled.
-- Scroll buttons: glass pill (48×48, borderRadius 24), `expo-blur` BlurView (intensity 20, tint light), `rgba(255,255,255,0.20)` bg, `1px solid #DADADA` border, layered shadow. Go-to-top appears at `top: 16` when scrollY > 80; go-to-bottom at `bottom: 165` when more than 80px from end. Arrow SVGs from Figma.
+- Scroll buttons: glass pill (24×24, borderRadius 12), `expo-blur` BlurView (intensity 20, tint light), `rgba(255,255,255,0.20)` bg, layered shadow. Go-to-top appears at `top: 16` when scrollY > 80; go-to-bottom at `bottom: 165` when more than 80px from end. Arrow SVGs from Figma, accept `color` prop. Border is a separate `absoluteFill` overlay view (not on the clip) so BlurView fills the full circle with no 1px gap — apply this pattern to all glass buttons.
+- Icon buttons (options, reset, return): `Pressable` with 48×48 pill (borderRadius 40). Normal bg: `rgba(237,237,237,0.5)` light / `rgba(50,50,50,0.5)` dark. Active/pressed bg: `rgba(237,237,237,1)` light / `rgba(50,50,50,1)` dark. Options keeps active state while menu is open (`optionsOpen` flag). Tap area provided by pill size — no hitSlop needed.
+- **Dark mode:** `store.getDarkMode()`/`setDarkMode()` persists across navigation. Both screens derive `bg`, `fg`, `icon`, `scrim`, `scrimClear`, `archFill`, `borderColor` inline at render time — StyleSheet stays static. StatusBar style, scrims, text, icons, borders, BlurView tints all adapt.
+- **Options menu** (`components/OptionsMenu.tsx`): Modal glass card, position from `measureInWindow` on button tap (`cardBottom = SCREEN_HEIGHT - anchorY + 12`). Spring open (tension 600, friction 38), timing close 120ms. Scale from bottom-left via compensating translateX/translateY. 35% black backdrop. iOS 18+: `systemMaterial`/`systemMaterialDark` tint; older: manual BlurView + rgba bg. Dark mode adapts tint, bg, text, border. Rows: Dark Mode → FullDivider → "Player Options" header → Auto-rotate → Mirror Mode → Keep Screen Awake → Font Size (chevron only, not yet wired).
 
 ## Decisions & Solutions Log
 Problems we've hit and how we solved them — do not revisit these.
@@ -92,6 +95,10 @@ Problems we've hit and how we solved them — do not revisit these.
 | 4 | `useAnimatedReaction` + `scrollTo` unreliable on RN 0.81 Fabric | Replaced with `requestAnimationFrame` + `scrollRef.current.scrollTo()` — frame-synced, JS-thread, works on all architectures. |
 | 5 | Speed dial background looked wrong (flat gray oval / full circle) | The background is an exact SVG arch from Figma (`DialArch` component, 109×40). Do not replace with a View or LinearGradient. The "go to bottom" button (iOS glass look) is a separate element — do not confuse it with the dial knob. |
 | 6 | Speed dial labels mispositioned / asymmetric | Labels must be symmetric around arch center (container x≈66). Correct positions: `.5x` left:12 top:12 rotate:-42deg, `1x` left:36 top:0 rotate:-15deg, `2x` left:74 top:0 rotate:15deg, `5x` left:95 top:12 rotate:41deg. Moving labels below the arch (into play button area) hides them behind the play button — keep top values at 0–12. |
+| 7 | Options menu position wrong repeatedly | Solved definitively with `measureInWindow` on the button at tap time. Do not compute from safe area insets. Formula: `cardBottom = SCREEN_HEIGHT - anchorY + 12`. |
+| 8 | Scrim gradient shows muddy gray midpoints in dark mode | The transparent end of a LinearGradient must match the opaque end's RGB channels. Use `rgba(255,255,255,0)` with white, `rgba(0,0,0,0)` with black. Using `rgba(0,0,0,0)` with a white start causes the interpolation to pass through gray. Store as `scrimClear` computed from `darkMode`. |
+| 9 | BlurView card looked opaque | `backgroundColor: '#fff'` on the shadow wrapper was blurring white → appeared solid. Fixed by setting shadow wrapper bg to `rgba(255,255,255,0.01)` so BlurView captures real background content. |
+| 10 | Glass buttons show 1px dark gap on all sides in dark mode | `borderWidth: 1` on the `overflow: hidden` clip view shrinks the content box, leaving a 1px gap the dark background bleeds through. Fix: remove border from clip view, add a separate `absoluteFill` View with just `borderWidth`/`borderRadius` rendered on top. BlurView fills the full container with no gap. |
 
 ## Haptics
 `expo-haptics` is wired to all main interactions:

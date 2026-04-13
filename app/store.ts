@@ -7,6 +7,7 @@ const DEFAULT_SCRIPT =
 let _scriptText = DEFAULT_SCRIPT;
 let _speed = 1;
 let _completedRun = false;
+let _darkMode = false;
 
 export const store = {
   getScript: () => _scriptText,
@@ -17,5 +18,7 @@ export const store = {
   // takeCompletedRun reads and clears in one shot so the editor only fires once.
   setCompletedRun: () => { _completedRun = true; },
   takeCompletedRun: () => { const v = _completedRun; _completedRun = false; return v; },
+  getDarkMode: () => _darkMode,
+  setDarkMode: (v: boolean) => { _darkMode = v; },
   DEFAULT_SCRIPT,
 };

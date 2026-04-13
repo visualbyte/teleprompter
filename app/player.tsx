@@ -3,13 +3,14 @@ import {
   Dimensions,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Pressable,
   SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
-  TouchableWithoutFeedback,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import Animated, {
@@ -42,6 +43,14 @@ export default function PlayerScreen() {
   const router = useRouter();
   const text = store.getScript();
   const speed = store.getSpeed();
+  const darkMode = store.getDarkMode();
+
+  const bg        = darkMode ? '#000' : '#fff';
+  const fg        = darkMode ? '#fff' : '#000';
+  const scrim     = darkMode ? '#000000' : '#ffffff';
+  const scrimClear = darkMode ? 'rgba(0,0,0,0)' : 'rgba(255,255,255,0)';
+  const pillBg    = darkMode ? 'rgba(50,50,50,0.5)' : 'rgba(237,237,237,0.5)';
+  const activeBg  = darkMode ? 'rgba(50,50,50,1)' : 'rgba(237,237,237,1)';
 
   const [state, setState] = useState<PlayerState>('countdown');
   const [countdown, setCountdown] = useState(3);
@@ -229,10 +238,10 @@ export default function PlayerScreen() {
   // Countdown — full screen, nothing else visible
   if (state === 'countdown') {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <SafeAreaView style={[styles.container, { backgroundColor: bg }]}>
+        <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} backgroundColor={bg} />
         <View style={styles.countdownScreen}>
-          <Animated.Text style={[styles.countdownNumber, countdownStyle]}>
+          <Animated.Text style={[styles.countdownNumber, { color: fg }, countdownStyle]}>
           {countdown}
         </Animated.Text>
         </View>
@@ -241,8 +250,8 @@ export default function PlayerScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <SafeAreaView style={[styles.container, { backgroundColor: bg }]}>
+      <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} backgroundColor={bg} />
       <Toast message={toast.message} id={toast.id} />
 
       <Animated.View style={[styles.fadeView, fadeStyle]}>
@@ -261,16 +270,16 @@ export default function PlayerScreen() {
             onScrollEndDrag={handleManualScrollEnd}
             onMomentumScrollEnd={handleManualScrollEnd}
           >
-            <Text style={styles.scriptText}>{text}</Text>
+            <Text style={[styles.scriptText, { color: fg }]}>{text}</Text>
           </ScrollView>
 
           <LinearGradient
-            colors={['#ffffff', 'rgba(255,255,255,0)']}
+            colors={[scrim, scrimClear]}
             style={styles.topScrim}
             pointerEvents="none"
           />
           <LinearGradient
-            colors={['rgba(255,255,255,0)', '#ffffff']}
+            colors={[scrimClear, scrim]}
             style={styles.bottomScrim}
             pointerEvents="none"
           />
@@ -284,9 +293,13 @@ export default function PlayerScreen() {
         )}
 
         {/* Return button */}
-        <TouchableOpacity style={styles.returnBtn} onPress={handleReturn}>
-          <ReturnIcon size={32} color="#000" />
-        </TouchableOpacity>
+        <Pressable style={styles.returnBtn} onPress={handleReturn}>
+          {({ pressed }) => (
+            <View style={[styles.returnBtnPill, { backgroundColor: pressed ? activeBg : pillBg }]}>
+              <ReturnIcon size={32} color={fg} />
+            </View>
+          )}
+        </Pressable>
 
         {/* Progress bar — depletes left→right as script is read */}
         <Animated.View style={[styles.progressBar, progressStyle]} pointerEvents="none" />
@@ -367,12 +380,15 @@ const styles = StyleSheet.create({
 
   returnBtn: {
     position: 'absolute',
-    bottom: 45,
-    left: 54,
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
+    bottom: 37,
+    left: 46,
+  },
+  returnBtnPill: {
+    width: 48,
+    height: 48,
+    borderRadius: 40,
     alignItems: 'center',
+    justifyContent: 'center',
   },
 
   pauseBtn: {

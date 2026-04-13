@@ -7,6 +7,7 @@ import {
   KeyboardEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Pressable,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -21,6 +22,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Toast, useToast } from '../components/Toast';
+import { OptionsMenu } from '../components/OptionsMenu';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Haptics from 'expo-haptics';
@@ -42,15 +44,19 @@ const SPEED_OPTIONS: { value: ScrollSpeed; label: string; left: number; top: num
 function SpeedDial({
   speed,
   onSpeedChange,
+  fg,
+  archFill,
 }: {
   speed: ScrollSpeed;
   onSpeedChange: (s: ScrollSpeed) => void;
+  fg: string;
+  archFill: string;
 }) {
   return (
     <View style={styles.dialContainer}>
       {/* arch background */}
       <View style={styles.dialBg}>
-        <DialArch />
+        <DialArch fill={archFill} />
       </View>
       {SPEED_OPTIONS.map((opt) => {
         const selected = speed === opt.value;
@@ -65,7 +71,7 @@ function SpeedDial({
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <View style={[styles.dialPill, selected && styles.dialPillSelected]}>
-              <Text style={[styles.dialPillText, selected && styles.dialPillTextSelected]}>
+              <Text style={[styles.dialPillText, { color: fg }, selected && styles.dialPillTextSelected]}>
                 {opt.label}
               </Text>
             </View>
@@ -76,14 +82,17 @@ function SpeedDial({
   );
 }
 
-function ScrollButton({ onPress, children, style }: { onPress: () => void; children: React.ReactNode; style: object }) {
+function ScrollButton({ onPress, children, style, borderColor }: { onPress: () => void; children: React.ReactNode; style: object; borderColor: string }) {
   return (
     <View style={[styles.scrollBtnShadow, style]}>
+      {/* Clip fills the full 48×48 — no border here so BlurView has no gap */}
       <TouchableOpacity onPress={onPress} style={styles.scrollBtnClip} activeOpacity={0.8}>
         <BlurView intensity={20} tint="light" style={styles.scrollBtnBlur}>
           {children}
         </BlurView>
       </TouchableOpacity>
+      {/* Border rendered on top as a separate overlay so it doesn't shrink the BlurView */}
+      <View style={[styles.scrollBtnBorder, { borderColor }]} pointerEvents="none" />
     </View>
   );
 }
@@ -94,6 +103,26 @@ export default function EditorScreen() {
   const [speed, setSpeed] = useState<ScrollSpeed>(1);
   const [scriptText, setScriptText] = useState(store.DEFAULT_SCRIPT);
   const [isEditing, setIsEditing] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [optionsAnchorY, setOptionsAnchorY] = useState(0);
+  const optionsBtnRef = useRef<View>(null);
+  const [darkMode, setDarkMode] = useState(store.getDarkMode());
+
+  const handleDarkModeChange = (v: boolean) => {
+    store.setDarkMode(v);
+    setDarkMode(v);
+  };
+
+  // Theme values derived from darkMode
+  const bg           = darkMode ? '#000' : '#fff';
+  const fg           = darkMode ? '#fff' : '#000';
+  const icon         = darkMode ? '#fff' : '#333';
+  const scrim        = darkMode ? '#000000' : '#ffffff';
+  const scrimClear   = darkMode ? 'rgba(0,0,0,0)' : 'rgba(255,255,255,0)';
+  const archFill     = darkMode ? '#2C2C2E' : '#F4F4F4';
+  const borderColor  = darkMode ? 'rgba(255,255,255,0.14)' : '#DADADA';
+  const pillBg       = darkMode ? 'rgba(50,50,50,0.5)' : 'rgba(237,237,237,0.5)';
+  const activeBg     = darkMode ? 'rgba(50,50,50,1)' : 'rgba(237,237,237,1)';
 
   const { toast, show } = useToast();
   const appBarAnim = useRef(new Animated.Value(0)).current;
@@ -187,9 +216,11 @@ export default function EditorScreen() {
     setIsEditing(false);
   };
 
+  const titleColor = darkMode ? '#636366' : '#b7b7b7';
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <SafeAreaView style={[styles.container, { backgroundColor: bg }]}>
+      <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} backgroundColor={bg} />
       <Toast message={toast.message} id={toast.id} />
 
       {/* App Bar */}
@@ -199,9 +230,9 @@ export default function EditorScreen() {
           style={[StyleSheet.absoluteFill, styles.appBarRow, { opacity: appBarAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [1, 0, 0] }) }]}
           pointerEvents={isEditing ? 'none' : 'auto'}
         >
-          <Text style={styles.appBarTitle}>Orra.</Text>
+          <Text style={[styles.appBarTitle, { color: titleColor }]}>Orra.</Text>
           <TouchableOpacity style={styles.appBarIcon} onPress={handleImport}>
-            <FileTrayIcon size={32} color="#333" />
+            <FileTrayIcon size={32} color={icon} />
           </TouchableOpacity>
         </Animated.View>
 
@@ -210,7 +241,7 @@ export default function EditorScreen() {
           style={[StyleSheet.absoluteFill, styles.appBarRow, { opacity: appBarAnim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0, 1] }) }]}
           pointerEvents={isEditing ? 'auto' : 'none'}
         >
-          <Text style={styles.appBarTitle}>Edit.</Text>
+          <Text style={[styles.appBarTitle, { color: titleColor }]}>Edit.</Text>
         </Animated.View>
       </View>
 
@@ -240,41 +271,42 @@ export default function EditorScreen() {
               onChangeText={setScriptText}
               multiline
               autoFocus
-              style={styles.scriptInput}
+              style={[styles.scriptInput, { color: fg }]}
               textAlignVertical="top"
+              keyboardAppearance={darkMode ? 'dark' : 'light'}
             />
           ) : (
             <TouchableWithoutFeedback onPress={() => setIsEditing(true)}>
-              <Text style={styles.scriptText}>{scriptText}</Text>
+              <Text style={[styles.scriptText, { color: fg }]}>{scriptText}</Text>
             </TouchableWithoutFeedback>
           )}
         </ScrollView>
 
-        {/* Top scrim — fades from white into script */}
+        {/* Top scrim — fades from bg into transparent */}
         <LinearGradient
-          colors={['#ffffff', 'rgba(255,255,255,0)']}
+          colors={[scrim, scrimClear]}
           style={styles.topScrim}
           pointerEvents="none"
         />
 
-        {/* Bottom scrim — fades up from white over controls */}
+        {/* Bottom scrim — fades up from bg over controls */}
         <LinearGradient
-          colors={['rgba(255,255,255,0)', '#ffffff']}
+          colors={[scrimClear, scrim]}
           style={styles.bottomScrim}
           pointerEvents="none"
         />
 
         {/* Go-to-top button */}
         {showGoToTop && (
-          <ScrollButton onPress={handleScrollToTop} style={styles.goTopBtn}>
-            <ArrowUpIcon />
+          <ScrollButton onPress={handleScrollToTop} style={styles.goTopBtn} borderColor={borderColor}>
+            <ArrowUpIcon color={icon} />
           </ScrollButton>
         )}
 
         {/* Go-to-bottom button */}
         {showGoToBottom && (
-          <ScrollButton onPress={handleScrollToBottom} style={styles.goBottomBtn}>
-            <ArrowDownIcon />
+          <ScrollButton onPress={handleScrollToBottom} style={styles.goBottomBtn} borderColor={borderColor}>
+            <ArrowDownIcon color={icon} />
           </ScrollButton>
         )}
 
@@ -283,9 +315,11 @@ export default function EditorScreen() {
           <View style={[styles.doneBtnShadow, { bottom: keyboardHeight + 16 }]}>
             <TouchableOpacity style={styles.doneBtnClip} onPress={handleDone} activeOpacity={0.8}>
               <BlurView intensity={20} tint="light" style={styles.doneBtnBlur}>
-                <Text style={styles.doneBtnText}>Done</Text>
+                <Text style={[styles.doneBtnText, { color: fg }]}>Done</Text>
               </BlurView>
             </TouchableOpacity>
+            {/* Border rendered on top as overlay — doesn't shrink BlurView content */}
+            <View style={[styles.doneBtnBorder, { borderColor }]} pointerEvents="none" />
           </View>
         )}
 
@@ -294,13 +328,27 @@ export default function EditorScreen() {
           <View style={styles.controls} pointerEvents="box-none">
             {/* Speed dial */}
             <View style={styles.dialWrapper}>
-              <SpeedDial speed={speed} onSpeedChange={setSpeed} />
+              <SpeedDial speed={speed} onSpeedChange={setSpeed} fg={fg} archFill={archFill} />
             </View>
 
             {/* Options */}
-            <TouchableOpacity style={styles.optionsBtn}>
-              <OptionsIcon size={32} color="#333" />
-            </TouchableOpacity>
+            <Pressable
+              ref={optionsBtnRef}
+              style={styles.optionsBtn}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                optionsBtnRef.current?.measureInWindow((_x, y) => {
+                  setOptionsAnchorY(y);
+                  setOptionsOpen(true);
+                });
+              }}
+            >
+              {({ pressed }) => (
+                <View style={[styles.iconPill, { backgroundColor: (pressed || optionsOpen) ? activeBg : pillBg }]}>
+                  <OptionsIcon size={32} color={icon} />
+                </View>
+              )}
+            </Pressable>
 
             {/* Play button */}
             <TouchableOpacity style={styles.playBtn} onPress={handlePlay}>
@@ -310,15 +358,26 @@ export default function EditorScreen() {
             </TouchableOpacity>
 
             {/* Reset */}
-            <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
-              <ResetIcon size={32} color="#333" />
-            </TouchableOpacity>
+            <Pressable style={styles.resetBtn} onPress={handleReset}>
+              {({ pressed }) => (
+                <View style={[styles.iconPill, { backgroundColor: pressed ? activeBg : pillBg }]}>
+                  <ResetIcon size={32} color={icon} />
+                </View>
+              )}
+            </Pressable>
 
             {/* Read time */}
             <Text style={styles.readTime}>{readTimeLabel}</Text>
           </View>
         )}
       </View>
+      <OptionsMenu
+        visible={optionsOpen}
+        onClose={() => setOptionsOpen(false)}
+        anchorY={optionsAnchorY}
+        darkMode={darkMode}
+        onDarkModeChange={handleDarkModeChange}
+      />
     </SafeAreaView>
   );
 }
@@ -399,6 +458,11 @@ const styles = StyleSheet.create({
   scrollBtnShadow: {
     position: 'absolute',
     alignSelf: 'center',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    // tiny bg required for iOS shadow to render
+    backgroundColor: 'rgba(255,255,255,0.001)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.14,
@@ -406,18 +470,21 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   scrollBtnClip: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    // fills full 24×24 so BlurView has no gap — border is a separate overlay
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 12,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#DADADA',
   },
   scrollBtnBlur: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.20)',
+  },
+  scrollBtnBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 12,
+    borderWidth: 1,
   },
   goTopBtn: {
     top: 16,
@@ -430,6 +497,8 @@ const styles = StyleSheet.create({
   doneBtnShadow: {
     position: 'absolute',
     right: 32,
+    backgroundColor: 'rgba(255,255,255,0.001)',
+    borderRadius: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.14,
@@ -437,10 +506,14 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   doneBtnClip: {
+    // no border — border is a separate overlay so BlurView fills fully
     borderRadius: 24,
     overflow: 'hidden',
+  },
+  doneBtnBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#DADADA',
   },
   doneBtnBlur: {
     paddingHorizontal: 24,
@@ -503,12 +576,8 @@ const styles = StyleSheet.create({
   // Options button (left)
   optionsBtn: {
     position: 'absolute',
-    bottom: 45,
-    left: 54,
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
+    bottom: 37,
+    left: 46,
   },
 
   // Play button (center)
@@ -529,12 +598,17 @@ const styles = StyleSheet.create({
   // Reset button (right)
   resetBtn: {
     position: 'absolute',
-    bottom: 45,
-    right: 54,
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
+    bottom: 37,
+    right: 46,
+  },
+
+  // Shared pill background for icon buttons (options, reset)
+  iconPill: {
+    width: 48,
+    height: 48,
+    borderRadius: 40,
     alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Read time
