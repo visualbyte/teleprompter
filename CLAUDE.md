@@ -7,6 +7,7 @@ Act as a senior software engineer with strong mobile UI and problem-solving skil
 1. Update memory files (`~/.claude/projects/.../memory/`) with anything new worth remembering
 2. Update `CLAUDE.md` to document new features, design decisions, or architecture changes
 3. Stage and commit everything together (code + docs in one commit)
+4. Push to GitHub (`git push origin main`)
 
 ## The UI Design
 - The URL for the design in figma:
@@ -99,6 +100,7 @@ Problems we've hit and how we solved them — do not revisit these.
 | 8 | Scrim gradient shows muddy gray midpoints in dark mode | The transparent end of a LinearGradient must match the opaque end's RGB channels. Use `rgba(255,255,255,0)` with white, `rgba(0,0,0,0)` with black. Using `rgba(0,0,0,0)` with a white start causes the interpolation to pass through gray. Store as `scrimClear` computed from `darkMode`. |
 | 9 | BlurView card looked opaque | `backgroundColor: '#fff'` on the shadow wrapper was blurring white → appeared solid. Fixed by setting shadow wrapper bg to `rgba(255,255,255,0.01)` so BlurView captures real background content. |
 | 10 | Glass buttons show 1px dark gap on all sides in dark mode | `borderWidth: 1` on the `overflow: hidden` clip view shrinks the content box, leaving a 1px gap the dark background bleeds through. Fix: remove border from clip view, add a separate `absoluteFill` View with just `borderWidth`/`borderRadius` rendered on top. BlurView fills the full container with no gap. |
+| 11 | Status bar invisible in dark mode | `_layout.tsx` had a hardcoded `expo-status-bar` with `barStyle="dark-content"` and `backgroundColor="#fff"` that overrode per-screen StatusBar settings. Fix: remove StatusBar from `_layout.tsx` entirely — each screen already sets it correctly via `darkMode ? 'light-content' : 'dark-content'`. |
 
 ## Haptics
 `expo-haptics` is wired to all main interactions:
