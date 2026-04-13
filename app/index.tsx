@@ -107,10 +107,16 @@ export default function EditorScreen() {
   const [optionsAnchorY, setOptionsAnchorY] = useState(0);
   const optionsBtnRef = useRef<View>(null);
   const [darkMode, setDarkMode] = useState(store.getDarkMode());
+  const [autoRotate, setAutoRotate] = useState(store.getAutoRotate());
 
   const handleDarkModeChange = (v: boolean) => {
     store.setDarkMode(v);
     setDarkMode(v);
+  };
+
+  const handleAutoRotateChange = (v: boolean) => {
+    store.setAutoRotate(v);
+    setAutoRotate(v);
   };
 
   // Theme values derived from darkMode
@@ -377,6 +383,8 @@ export default function EditorScreen() {
         anchorY={optionsAnchorY}
         darkMode={darkMode}
         onDarkModeChange={handleDarkModeChange}
+        autoRotate={autoRotate}
+        onAutoRotateChange={handleAutoRotateChange}
       />
     </SafeAreaView>
   );

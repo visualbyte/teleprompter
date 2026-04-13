@@ -8,6 +8,7 @@ let _scriptText = DEFAULT_SCRIPT;
 let _speed = 1;
 let _completedRun = false;
 let _darkMode = false;
+let _autoRotate = false;
 
 export const store = {
   getScript: () => _scriptText,
@@ -20,5 +21,7 @@ export const store = {
   takeCompletedRun: () => { const v = _completedRun; _completedRun = false; return v; },
   getDarkMode: () => _darkMode,
   setDarkMode: (v: boolean) => { _darkMode = v; },
+  getAutoRotate: () => _autoRotate,
+  setAutoRotate: (v: boolean) => { _autoRotate = v; },
   DEFAULT_SCRIPT,
 };

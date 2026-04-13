@@ -43,7 +43,7 @@ A teleprompter scrolls a script at a controlled speed so a speaker can read whil
 - `app/player.tsx` — Player: 3-2-1 countdown, requestAnimationFrame scroll, tap to pause/resume, fade-to-white on end
 - `app/_layout.tsx` — Stack navigator, no headers, player has no transition animation
 
-**State:** `app/store.ts` — module-level store (no Redux/Zustand). Passes script text, speed, and dark mode between screens. URL params were abandoned due to text length cutoff.
+**State:** `app/store.ts` — module-level store (no Redux/Zustand). Passes script text, speed, dark mode, and autoRotate between screens. URL params were abandoned due to text length cutoff.
 
 **Icons:** Custom SVG components in `components/icons.tsx` (Play, Pause, Return, Reset, Options, FileTray, DialArch, ArrowUpIcon, ArrowDownIcon).
 
@@ -61,16 +61,16 @@ A teleprompter scrolls a script at a controlled speed so a speaker can read whil
 | expo-linear-gradient | ^15.0.8 |
 | expo-document-picker | ~14.0.8 |
 | expo-haptics | ~15.0.8 |
+| expo-screen-orientation | ~8.0.1 |
 
 ## Architecture Notes
 - Scroll animation uses `requestAnimationFrame` calling `scrollRef.current.scrollTo()` every frame — reliable on RN 0.81 new architecture (Fabric)
 - `scrollYRef` (plain ref) tracks current scroll position; synced from `onScrollEndDrag` / `onMomentumScrollEnd` after manual drag
 - `onScrollBeginDrag` pauses auto-scroll when user drags; animation resumes from `scrollYRef.current` on next play
-- `READING_LINE = SCREEN_HEIGHT / 2` as static top/bottom padding — places start/end pills at screen center
+- Scroll content padding (`paddingTop`, `paddingBottom`, `paddingLeft`, `paddingRight`) all set inline using `screenHeight` from `useWindowDimensions()` and `insets` from `useSafeAreaInsets()` — adapts correctly on rotation
 - Reanimated used for: countdown zoom-out animation (scale 1→1.6, opacity 1→0, 850ms), player fade-in on first play (opacity 0→1, 800ms), fade-to-white on natural end (opacity 1→0, 500ms with 600ms delay), play button auto-hide (fade out 400ms after 2.5s, fade in 200ms on tap), progress bar width
 - Play button auto-hide: `btnOpacity` shared value, `hideTimerRef` setTimeout. Fades out only while playing; any tap calls `showButton()` immediately before state change. `scheduleHide()` restarts timer on each resume.
-- Progress bar: `progressValue` shared value (1→0), updated every RAF frame via `1 - scrollYRef.current / maxScroll`. `maxScrollRef` caches max scroll so it's accessible in `handleManualScrollEnd` for post-drag sync. Width = `progressValue * SCREEN_WIDTH`, left-anchored, shrinks from right.
-- Scroll content: `paddingTop: READING_LINE + 96` (text starts 96px below reading line), `paddingBottom: READING_LINE + 180` (restores end runway lost when start/end pills were removed)
+- Progress bar: `progressValue` shared value (1→0), updated every RAF frame via `1 - scrollYRef.current / maxScroll`. `maxScrollRef` caches max scroll so it's accessible in `handleManualScrollEnd` for post-drag sync. Width = `progressValue * screenWidth`, left-anchored, shrinks from right.
 - Start and end pills removed — replaced by toasts: "start reading" on first play, "fin." on natural end. Toast shadow: opacity 0.18, radius 20, offset 6, elevation 10.
 
 ## Design
@@ -84,6 +84,7 @@ A teleprompter scrolls a script at a controlled speed so a speaker can read whil
 - Icon buttons (options, reset, return): `Pressable` with 48×48 pill (borderRadius 40). Normal bg: `rgba(237,237,237,0.5)` light / `rgba(50,50,50,0.5)` dark. Active/pressed bg: `rgba(237,237,237,1)` light / `rgba(50,50,50,1)` dark. Options keeps active state while menu is open (`optionsOpen` flag). Tap area provided by pill size — no hitSlop needed.
 - **Dark mode:** `store.getDarkMode()`/`setDarkMode()` persists across navigation. Both screens derive `bg`, `fg`, `icon`, `scrim`, `scrimClear`, `archFill`, `borderColor` inline at render time — StyleSheet stays static. StatusBar style, scrims, text, icons, borders, BlurView tints all adapt.
 - **Options menu** (`components/OptionsMenu.tsx`): Modal glass card, position from `measureInWindow` on button tap (`cardBottom = SCREEN_HEIGHT - anchorY + 12`). Spring open (tension 600, friction 38), timing close 120ms. Scale from bottom-left via compensating translateX/translateY. 35% black backdrop. iOS 18+: `systemMaterial`/`systemMaterialDark` tint; older: manual BlurView + rgba bg. Dark mode adapts tint, bg, text, border. Rows: Dark Mode → FullDivider → "Player Options" header → Auto-rotate → Mirror Mode → Keep Screen Awake → Font Size (chevron only, not yet wired).
+- **Auto-rotate:** `store.getAutoRotate()`/`setAutoRotate()` persists across navigation. Player locks to `LANDSCAPE_RIGHT` on mount if enabled (notch on left, buttons on right), or `PORTRAIT_UP` if disabled. Always re-locks to `PORTRAIT_UP` on unmount. Toast "rotate screen" shown on first countdown tick if autoRotate on and not already landscape. `app.json` orientation is `"default"` to allow programmatic locking. Player uses plain `View` (not `SafeAreaView`) so absolute-positioned buttons are relative to the full screen. Scrim heights are `screenHeight * 0.2` (top) and `screenHeight * 0.4` (bottom) — always proportional. In landscape: return button `right: 37, bottom: 46`; pause/play `right: 21, top: center`; text `paddingLeft: insets.left + 32` to clear notch/island.
 
 ## Decisions & Solutions Log
 Problems we've hit and how we solved them — do not revisit these.
@@ -101,6 +102,9 @@ Problems we've hit and how we solved them — do not revisit these.
 | 9 | BlurView card looked opaque | `backgroundColor: '#fff'` on the shadow wrapper was blurring white → appeared solid. Fixed by setting shadow wrapper bg to `rgba(255,255,255,0.01)` so BlurView captures real background content. |
 | 10 | Glass buttons show 1px dark gap on all sides in dark mode | `borderWidth: 1` on the `overflow: hidden` clip view shrinks the content box, leaving a 1px gap the dark background bleeds through. Fix: remove border from clip view, add a separate `absoluteFill` View with just `borderWidth`/`borderRadius` rendered on top. BlurView fills the full container with no gap. |
 | 11 | Status bar invisible in dark mode | `_layout.tsx` had a hardcoded `expo-status-bar` with `barStyle="dark-content"` and `backgroundColor="#fff"` that overrode per-screen StatusBar settings. Fix: remove StatusBar from `_layout.tsx` entirely — each screen already sets it correctly via `darkMode ? 'light-content' : 'dark-content'`. |
+| 12 | Player rotates even when auto-rotate is off | `app.json` orientation changed to `"default"` — must always lock explicitly on player mount. If autoRotate off → `PORTRAIT_UP`; if on → `LANDSCAPE_RIGHT`. Never use `unlockAsync()`. |
+| 13 | Landscape buttons far from right edge | `SafeAreaView` shrinks its own frame to avoid safe areas, so `position: absolute` with `right: N` is N pts from SafeAreaView's edge, not the screen. Fix: use plain `View` in player so the container is always full-screen. |
+| 14 | Buttons conflict with notch/island in landscape | Lock to `LANDSCAPE_RIGHT` (notch on left). Use `insets.left + 32` as `paddingLeft` on scroll content to push text past the notch. Right side is always clear — no `insets.right` needed for buttons. |
 
 ## Haptics
 `expo-haptics` is wired to all main interactions:

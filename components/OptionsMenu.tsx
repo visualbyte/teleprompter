@@ -23,6 +23,8 @@ interface Props {
   anchorY: number;
   darkMode: boolean;
   onDarkModeChange: (v: boolean) => void;
+  autoRotate: boolean;
+  onAutoRotateChange: (v: boolean) => void;
 }
 
 function FullDivider() {
@@ -67,7 +69,7 @@ const SCALE_DELTA = 1 - SCALE_START;
 const CARD_HEIGHT = 189;
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export function OptionsMenu({ visible, onClose, anchorY, darkMode, onDarkModeChange }: Props) {
+export function OptionsMenu({ visible, onClose, anchorY, darkMode, onDarkModeChange, autoRotate, onAutoRotateChange }: Props) {
   const anim = useRef(new Animated.Value(0)).current;
   const [isRendered, setIsRendered] = useState(false);
 
@@ -77,7 +79,6 @@ export function OptionsMenu({ visible, onClose, anchorY, darkMode, onDarkModeCha
   const borderColor = darkMode ? 'rgba(255,255,255,0.12)' : '#DADADA';
   const labelColor  = darkMode ? '#98989D' : '#8E8E93';
 
-  const [autoRotate, setAutoRotate] = useState(false);
   const [mirrorMode, setMirrorMode] = useState(false);
   const [keepAwake, setKeepAwake] = useState(false);
 
@@ -159,7 +160,7 @@ export function OptionsMenu({ visible, onClose, anchorY, darkMode, onDarkModeCha
                 <OptionRow
                   label="Auto-rotate"
                   color={fg}
-                  right={<ToggleSwitch value={autoRotate} onChange={setAutoRotate} />}
+                  right={<ToggleSwitch value={autoRotate} onChange={onAutoRotateChange} />}
                 />
                 <InsetDivider />
                 <OptionRow

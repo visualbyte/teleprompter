@@ -1,18 +1,18 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Dimensions,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -23,6 +23,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { PauseIcon, PlayIcon, ReturnIcon } from '../components/icons';
 import { Toast, useToast } from '../components/Toast';
@@ -31,19 +32,19 @@ import { store } from './store';
 
 type PlayerState = 'countdown' | 'playing' | 'paused' | 'ended';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PAUSE_BTN_SIZE = 80;
-
-// Half the physical screen height used as top/bottom padding so the
-// start pill and end pill each land at the vertical center (reading line)
-// when scrollY = 0 and scrollY = maxScroll respectively.
-const READING_LINE = SCREEN_HEIGHT / 2;
+// Static dimensions based on portrait — used for scroll padding and initial button layout.
 
 export default function PlayerScreen() {
   const router = useRouter();
   const text = store.getScript();
   const speed = store.getSpeed();
   const darkMode = store.getDarkMode();
+  const autoRotate = store.getAutoRotate();
+
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const isLandscape = screenWidth > screenHeight;
+  const insets = useSafeAreaInsets();
 
   const bg        = darkMode ? '#000' : '#fff';
   const fg        = darkMode ? '#fff' : '#000';
@@ -66,10 +67,23 @@ export default function PlayerScreen() {
 
   const screenOpacity = useSharedValue(0);
 
+  // Lock to landscape-left on mount if autoRotate (notch stays on left, right side clear).
+  // Lock orientation on mount; always restore portrait on unmount.
+  useEffect(() => {
+    ScreenOrientation.lockAsync(
+      autoRotate
+        ? ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT
+        : ScreenOrientation.OrientationLock.PORTRAIT_UP
+    );
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    };
+  }, []);
+
   // Progress bar (1 = full / 100% remaining, 0 = empty)
   const progressValue = useSharedValue(1);
   const progressStyle = useAnimatedStyle(() => ({
-    width: progressValue.value * SCREEN_WIDTH,
+    width: progressValue.value * screenWidth,
   }));
 
   // Play button auto-hide
@@ -110,6 +124,10 @@ export default function PlayerScreen() {
   useEffect(() => {
     if (state !== 'countdown' || countdown === 0) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Show rotate prompt once on the first countdown tick
+    if (countdown === 3 && autoRotate && !isLandscape) {
+      show('rotate screen');
+    }
     countdownScale.value = 1;
     countdownOpacity.value = 1;
     countdownScale.value = withTiming(1.6, { duration: 850, easing: Easing.out(Easing.ease) });
@@ -238,19 +256,20 @@ export default function PlayerScreen() {
   // Countdown — full screen, nothing else visible
   if (state === 'countdown') {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: bg }]}>
+      <View style={[styles.container, { backgroundColor: bg }]}>
         <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} backgroundColor={bg} />
+        <Toast message={toast.message} id={toast.id} />
         <View style={styles.countdownScreen}>
           <Animated.Text style={[styles.countdownNumber, { color: fg }, countdownStyle]}>
           {countdown}
         </Animated.Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: bg }]}>
+    <View style={[styles.container, { backgroundColor: bg }]}>
       <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} backgroundColor={bg} />
       <Toast message={toast.message} id={toast.id} />
 
@@ -263,7 +282,15 @@ export default function PlayerScreen() {
             scrollEnabled={true}
             showsVerticalScrollIndicator={false}
             style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[
+              styles.scrollContent,
+              {
+                paddingTop: screenHeight / 2 + 96,
+                paddingBottom: screenHeight / 2 + 180,
+                paddingLeft: isLandscape ? insets.left + 32 : 32,
+                paddingRight: isLandscape ? insets.right + PAUSE_BTN_SIZE + 21 + 16 : 32,
+              },
+            ]}
             onContentSizeChange={(_, h) => setContentHeight(h)}
             onLayout={(e) => setScrollViewHeight(e.nativeEvent.layout.height)}
             onScrollBeginDrag={() => { if (state === 'playing') setState('paused'); }}
@@ -275,12 +302,12 @@ export default function PlayerScreen() {
 
           <LinearGradient
             colors={[scrim, scrimClear]}
-            style={styles.topScrim}
+            style={[styles.topScrim, { height: screenHeight * 0.2 }]}
             pointerEvents="none"
           />
           <LinearGradient
             colors={[scrimClear, scrim]}
-            style={styles.bottomScrim}
+            style={[styles.bottomScrim, { height: screenHeight * 0.4 }]}
             pointerEvents="none"
           />
         </View>
@@ -293,7 +320,15 @@ export default function PlayerScreen() {
         )}
 
         {/* Return button */}
-        <Pressable style={styles.returnBtn} onPress={handleReturn}>
+        <Pressable
+          style={[
+            styles.returnBtn,
+            isLandscape
+              ? { right: 37, bottom: 46 }
+              : { left: 46, bottom: 37 },
+          ]}
+          onPress={handleReturn}
+        >
           {({ pressed }) => (
             <View style={[styles.returnBtnPill, { backgroundColor: pressed ? activeBg : pillBg }]}>
               <ReturnIcon size={32} color={fg} />
@@ -305,7 +340,16 @@ export default function PlayerScreen() {
         <Animated.View style={[styles.progressBar, progressStyle]} pointerEvents="none" />
 
         {/* Pause / Play — always tappable for both pause and resume */}
-        <Animated.View style={[styles.pauseBtn, btnStyle]} pointerEvents="box-none">
+        <Animated.View
+          style={[
+            styles.pauseBtn,
+            btnStyle,
+            isLandscape
+              ? { right: 21, top: (screenHeight - PAUSE_BTN_SIZE) / 2 }
+              : { left: (screenWidth - PAUSE_BTN_SIZE) / 2, bottom: 21 },
+          ]}
+          pointerEvents="box-none"
+        >
           <TouchableOpacity style={StyleSheet.absoluteFill} onPress={handleTap}>
             <View style={[
               styles.pauseBtnCircle,
@@ -319,7 +363,7 @@ export default function PlayerScreen() {
         </Animated.View>
 
       </Animated.View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -348,12 +392,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 32,
-    // READING_LINE (= SCREEN_HEIGHT / 2) as top/bottom padding places the
-    // start pill at the screen centre when scrollY=0 and the end pill at
-    // the screen centre when scrollY=maxScroll.
-    paddingTop: READING_LINE + 96,
-    paddingBottom: READING_LINE + 180,
+    // All padding set inline — adapts to orientation and safe area insets.
   },
 
   scriptText: {
@@ -368,20 +407,16 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 154,
   },
   bottomScrim: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 410,
   },
 
   returnBtn: {
     position: 'absolute',
-    bottom: 37,
-    left: 46,
   },
   returnBtnPill: {
     width: 48,
@@ -393,8 +428,6 @@ const styles = StyleSheet.create({
 
   pauseBtn: {
     position: 'absolute',
-    bottom: 21,
-    left: (SCREEN_WIDTH - PAUSE_BTN_SIZE) / 2,
     width: PAUSE_BTN_SIZE,
     height: PAUSE_BTN_SIZE,
   },
