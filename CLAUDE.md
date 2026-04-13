@@ -8,7 +8,8 @@ Act as a senior software engineer with strong mobile UI and problem-solving skil
 2. Update `CLAUDE.md` to document new features, design decisions, or architecture changes
 3. Stage and commit everything together (code + docs in one commit)
 
-## Figma
+## The UI Design
+- The URL for the design in figma:
 https://www.figma.com/design/LFRVlQU3x3TRIAalhUvj3R/orra-app?node-id=24-390&t=nnLNLf3iPh2Vmoff-0
 
 ## What is a Teleprompter App
