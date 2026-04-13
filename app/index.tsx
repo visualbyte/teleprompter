@@ -222,18 +222,26 @@ export default function EditorScreen() {
     setIsEditing(false);
   };
 
-  const titleColor = darkMode ? '#636366' : '#b7b7b7';
+  const titleColor = darkMode ? '#8E8E93' : '#8E8E93';
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: bg }]}>
       <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} backgroundColor={bg} />
       <Toast message={toast.message} id={toast.id} />
 
-      {/* App Bar */}
-      <View style={styles.appBar}>
+      {/* App Bar — absolute, extends behind status bar like iOS nav bars */}
+      <View style={[styles.appBar, { height: 80 + insets.top, zIndex: 10 }]} pointerEvents="box-none">
+        <BlurView
+          intensity={60}
+          tint={darkMode ? 'dark' : 'light'}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* Hairline bottom border */}
+        <View style={[styles.appBarBorder, { backgroundColor: borderColor }]} pointerEvents="none" />
+
         {/* View mode: "Orra." + import — fades out on edit */}
         <Animated.View
-          style={[StyleSheet.absoluteFill, styles.appBarRow, { opacity: appBarAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [1, 0, 0] }) }]}
+          style={[StyleSheet.absoluteFill, styles.appBarRow, { paddingTop: insets.top, opacity: appBarAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [1, 0, 0] }) }]}
           pointerEvents={isEditing ? 'none' : 'auto'}
         >
           <Text style={[styles.appBarTitle, { color: titleColor }]}>Orra.</Text>
@@ -244,7 +252,7 @@ export default function EditorScreen() {
 
         {/* Edit mode: "Edit." — fades in on edit */}
         <Animated.View
-          style={[StyleSheet.absoluteFill, styles.appBarRow, { opacity: appBarAnim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0, 1] }) }]}
+          style={[StyleSheet.absoluteFill, styles.appBarRow, { paddingTop: insets.top, opacity: appBarAnim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0, 1] }) }]}
           pointerEvents={isEditing ? 'auto' : 'none'}
         >
           <Text style={[styles.appBarTitle, { color: titleColor }]}>Edit.</Text>
@@ -261,6 +269,7 @@ export default function EditorScreen() {
           ]}
           contentContainerStyle={[
             styles.scrollContent,
+            { paddingTop: 96 },
             isEditing && { paddingBottom: 80 },
           ]}
           keyboardShouldPersistTaps="handled"
@@ -287,13 +296,6 @@ export default function EditorScreen() {
             </TouchableWithoutFeedback>
           )}
         </ScrollView>
-
-        {/* Top scrim — fades from bg into transparent */}
-        <LinearGradient
-          colors={[scrim, scrimClear]}
-          style={styles.topScrim}
-          pointerEvents="none"
-        />
 
         {/* Bottom scrim — fades up from bg over controls */}
         <LinearGradient
@@ -401,7 +403,19 @@ const styles = StyleSheet.create({
 
   // App bar
   appBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     height: 80,
+    overflow: 'hidden',
+  },
+  appBarBorder: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
   },
   appBarRow: {
     flexDirection: 'row',
@@ -446,13 +460,6 @@ const styles = StyleSheet.create({
   },
 
   // Scrims
-  topScrim: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 80,
-  },
   bottomScrim: {
     position: 'absolute',
     bottom: 0,

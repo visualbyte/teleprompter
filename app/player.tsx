@@ -20,7 +20,6 @@ import Animated, {
   withDelay,
   Easing,
   cancelAnimation,
-  runOnJS,
 } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -216,18 +215,18 @@ export default function PlayerScreen() {
     return clearHideTimer;
   }, [state, showButton, scheduleHide, clearHideTimer]);
 
-  // Ended: brief pause → fade to white → go back
+  // Ended: brief pause → fade to white → go back.
+  // Navigation is driven by setTimeout (not the animation callback) so it
+  // always fires even if the reanimated worklet callback is dropped.
   useEffect(() => {
     if (state !== 'ended') return;
     screenOpacity.value = withDelay(
       600,
-      withTiming(0, { duration: 500, easing: Easing.out(Easing.ease) }, (finished) => {
-        if (finished) {
-          runOnJS(store.setCompletedRun)();
-          runOnJS(router.back)();
-        }
-      })
+      withTiming(0, { duration: 500, easing: Easing.out(Easing.ease) })
     );
+    store.setCompletedRun();
+    const timer = setTimeout(() => router.back(), 1300);
+    return () => clearTimeout(timer);
   }, [state]);
 
   const handleTap = () => {
