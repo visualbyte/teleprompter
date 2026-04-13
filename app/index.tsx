@@ -306,7 +306,7 @@ export default function EditorScreen() {
 
         {/* Go-to-top button */}
         {showGoToTop && (
-          <ScrollButton onPress={handleScrollToTop} style={styles.goTopBtn} borderColor={borderColor}>
+          <ScrollButton onPress={handleScrollToTop} style={[styles.goTopBtn, { top: 96 }]} borderColor={borderColor}>
             <ArrowUpIcon color={icon} />
           </ScrollButton>
         )}
