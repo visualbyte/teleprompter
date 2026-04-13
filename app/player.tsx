@@ -50,11 +50,43 @@ export default function PlayerScreen() {
 
   const scrollRef = useRef<ScrollView>(null);
   const scrollYRef = useRef(0);
+  const maxScrollRef = useRef(0);
   const rafRef = useRef<number | null>(null);
 
   const { toast, show } = useToast();
 
   const screenOpacity = useSharedValue(0);
+
+  // Progress bar (1 = full / 100% remaining, 0 = empty)
+  const progressValue = useSharedValue(1);
+  const progressStyle = useAnimatedStyle(() => ({
+    width: progressValue.value * SCREEN_WIDTH,
+  }));
+
+  // Play button auto-hide
+  const btnOpacity = useSharedValue(1);
+  const btnStyle = useAnimatedStyle(() => ({ opacity: btnOpacity.value }));
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current !== null) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
+
+  const showButton = useCallback(() => {
+    clearHideTimer();
+    btnOpacity.value = withTiming(1, { duration: 200 });
+  }, [clearHideTimer]);
+
+  const scheduleHide = useCallback(() => {
+    clearHideTimer();
+    hideTimerRef.current = setTimeout(() => {
+      btnOpacity.value = withTiming(0, { duration: 400 });
+    }, 2500);
+  }, [clearHideTimer]);
+
   const fadedIn = useRef(false);
   const fadeStyle = useAnimatedStyle(() => ({ opacity: screenOpacity.value }));
 
@@ -101,6 +133,7 @@ export default function PlayerScreen() {
 
     if (state === 'playing' && contentHeight > 0 && scrollViewHeight > 0) {
       const maxScroll = Math.max(0, contentHeight - scrollViewHeight);
+      maxScrollRef.current = maxScroll;
       if (scrollYRef.current >= maxScroll) { setState('ended'); return; }
 
       const pixelsPerMs = (80 * speed) / 1000;
@@ -111,6 +144,7 @@ export default function PlayerScreen() {
           const delta = time - lastTime;
           scrollYRef.current = Math.min(scrollYRef.current + pixelsPerMs * delta, maxScroll);
           scrollRef.current?.scrollTo({ y: scrollYRef.current, animated: false });
+          progressValue.value = 1 - scrollYRef.current / maxScroll;
 
           if (scrollYRef.current >= maxScroll) {
             setState('ended');
@@ -142,6 +176,19 @@ export default function PlayerScreen() {
     if (state === 'ended') show('fin.');
   }, [state]);
 
+  // Auto-hide play button while playing; show when paused or ended
+  useEffect(() => {
+    if (state === 'playing') {
+      showButton();
+      scheduleHide();
+    } else if (state === 'paused') {
+      showButton();
+    } else {
+      clearHideTimer();
+    }
+    return clearHideTimer;
+  }, [state, showButton, scheduleHide, clearHideTimer]);
+
   // Ended: brief pause → fade to white → go back
   useEffect(() => {
     if (state !== 'ended') return;
@@ -158,6 +205,7 @@ export default function PlayerScreen() {
 
   const handleTap = () => {
     if (state === 'countdown' || state === 'ended') return;
+    showButton();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setState(state === 'playing' ? 'paused' : 'playing');
   };
@@ -173,6 +221,9 @@ export default function PlayerScreen() {
   // resumes from the user's chosen position, not the pre-drag position.
   const handleManualScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     scrollYRef.current = e.nativeEvent.contentOffset.y;
+    if (maxScrollRef.current > 0) {
+      progressValue.value = 1 - scrollYRef.current / maxScrollRef.current;
+    }
   };
 
   // Countdown — full screen, nothing else visible
@@ -237,17 +288,22 @@ export default function PlayerScreen() {
           <ReturnIcon size={32} color="#000" />
         </TouchableOpacity>
 
+        {/* Progress bar — depletes left→right as script is read */}
+        <Animated.View style={[styles.progressBar, progressStyle]} pointerEvents="none" />
+
         {/* Pause / Play — always tappable for both pause and resume */}
-        <TouchableOpacity style={styles.pauseBtn} onPress={handleTap}>
-          <View style={[
-            styles.pauseBtnCircle,
-            state === 'paused' ? styles.pauseCircleGreen : styles.pauseCircleRed,
-          ]}>
-            {state === 'paused'
-              ? <PlayIcon size={32} color="#fff" />
-              : <PauseIcon size={32} color="#fff" />}
-          </View>
-        </TouchableOpacity>
+        <Animated.View style={[styles.pauseBtn, btnStyle]} pointerEvents="box-none">
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={handleTap}>
+            <View style={[
+              styles.pauseBtnCircle,
+              state === 'paused' ? styles.pauseCircleGreen : styles.pauseCircleRed,
+            ]}>
+              {state === 'paused'
+                ? <PlayIcon size={32} color="#fff" />
+                : <PauseIcon size={32} color="#fff" />}
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
 
       </Animated.View>
     </SafeAreaView>
@@ -334,4 +390,12 @@ const styles = StyleSheet.create({
   },
   pauseCircleRed: { backgroundColor: '#ff3b30' },
   pauseCircleGreen: { backgroundColor: '#34c759' },
+
+  progressBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    height: 3,
+    backgroundColor: '#34c759',
+  },
 });

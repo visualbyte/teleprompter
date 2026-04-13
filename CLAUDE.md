@@ -24,8 +24,9 @@ A teleprompter scrolls a script at a controlled speed so a speaker can read whil
 - After countdown (3-2-1), text auto-scrolls at the selected speed
 - **Tap anywhere** → pause / resume from current position
 - **Drag** → immediately pauses auto-scroll, user can freely scroll back and forth (e.g. re-read missed text); tap resumes from wherever they stopped
-- **Pause/Play button** (bottom center) → same as tap
+- **Pause/Play button** (bottom center) → same as tap; auto-hides after 2.5s of playing, reappears instantly on any tap; stays visible when paused
 - **Return button** (bottom left) → back to editor at any time, cancels animation
+- **Progress bar** (bottom edge, green) → 3px bar, full width at start, depletes right-to-left as script is read; always visible
 
 ## Project Overview
 "Orra" is a React Native teleprompter app built with Expo SDK 54.
@@ -59,7 +60,9 @@ A teleprompter scrolls a script at a controlled speed so a speaker can read whil
 - `scrollYRef` (plain ref) tracks current scroll position; synced from `onScrollEndDrag` / `onMomentumScrollEnd` after manual drag
 - `onScrollBeginDrag` pauses auto-scroll when user drags; animation resumes from `scrollYRef.current` on next play
 - `READING_LINE = SCREEN_HEIGHT / 2` as static top/bottom padding — places start/end pills at screen center
-- Reanimated used for: countdown zoom-out animation (scale 1→1.6, opacity 1→0, 850ms), player fade-in on first play (opacity 0→1, 800ms), and fade-to-white on natural end (opacity 1→0, 500ms with 600ms delay)
+- Reanimated used for: countdown zoom-out animation (scale 1→1.6, opacity 1→0, 850ms), player fade-in on first play (opacity 0→1, 800ms), fade-to-white on natural end (opacity 1→0, 500ms with 600ms delay), play button auto-hide (fade out 400ms after 2.5s, fade in 200ms on tap), progress bar width
+- Play button auto-hide: `btnOpacity` shared value, `hideTimerRef` setTimeout. Fades out only while playing; any tap calls `showButton()` immediately before state change. `scheduleHide()` restarts timer on each resume.
+- Progress bar: `progressValue` shared value (1→0), updated every RAF frame via `1 - scrollYRef.current / maxScroll`. `maxScrollRef` caches max scroll so it's accessible in `handleManualScrollEnd` for post-drag sync. Width = `progressValue * SCREEN_WIDTH`, left-anchored, shrinks from right.
 - Scroll content: `paddingTop: READING_LINE + 96` (text starts 96px below reading line), `paddingBottom: READING_LINE + 180` (restores end runway lost when start/end pills were removed)
 - Start and end pills removed — replaced by toasts: "start reading" on first play, "fin." on natural end. Toast shadow: opacity 0.18, radius 20, offset 6, elevation 10.
 
