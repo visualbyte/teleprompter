@@ -3,7 +3,6 @@ import {
   Animated,
   Dimensions,
   Modal,
-  Platform,
   StyleSheet,
   Switch,
   Text,
@@ -12,10 +11,6 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 
-// iOS 26+ uses Liquid Glass — systemMaterial maps to the native menu material.
-// On older iOS and Android we fall back to our manual glass style.
-const IOS_VERSION = Platform.OS === 'ios' ? parseInt(Platform.Version as string, 10) : 0;
-const USE_SYSTEM_MATERIAL = Platform.OS === 'ios' && IOS_VERSION >= 18;
 
 interface Props {
   visible: boolean;
@@ -57,8 +52,8 @@ function ToggleSwitch({ value, onChange }: { value: boolean; onChange: (v: boole
     <Switch
       value={value}
       onValueChange={onChange}
-      trackColor={{ false: '#E5E5EA', true: '#34c759' }}
-      ios_backgroundColor="#E5E5EA"
+      trackColor={{ false: '#AEAEB2', true: '#34c759' }}
+      ios_backgroundColor="#AEAEB2"
     />
   );
 }
@@ -74,8 +69,8 @@ export function OptionsMenu({ visible, onClose, anchorY, darkMode, onDarkModeCha
   const [isRendered, setIsRendered] = useState(false);
 
   const fg          = darkMode ? '#fff' : '#000';
-  const blurTint    = USE_SYSTEM_MATERIAL ? (darkMode ? 'systemMaterialDark' : 'systemMaterial') : (darkMode ? 'dark' : 'light');
-  const blurBg      = USE_SYSTEM_MATERIAL ? 'transparent' : (darkMode ? 'rgba(30,30,32,0.82)' : 'rgba(255,255,255,0.20)');
+  const blurTint    = darkMode ? 'dark' : 'light';
+  const blurBg      = darkMode ? 'rgba(30,30,32,0.82)' : 'rgba(255,255,255,0.72)';
   const borderColor = darkMode ? 'rgba(255,255,255,0.12)' : '#DADADA';
   const labelColor  = darkMode ? '#98989D' : '#8E8E93';
 
@@ -145,7 +140,7 @@ export function OptionsMenu({ visible, onClose, anchorY, darkMode, onDarkModeCha
           <View style={styles.cardShadow}>
             <View style={styles.cardClip}>
               <BlurView
-                intensity={USE_SYSTEM_MATERIAL ? 100 : 20}
+                intensity={60}
                 tint={blurTint}
                 style={[styles.blur, { backgroundColor: blurBg }]}
               >

@@ -4,9 +4,11 @@ import {
   Animated,
   Dimensions,
   Keyboard,
+  KeyboardAvoidingView,
   KeyboardEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -15,7 +17,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
@@ -103,6 +104,10 @@ export default function EditorScreen() {
   const [speed, setSpeed] = useState<ScrollSpeed>(1);
   const [scriptText, setScriptText] = useState(store.DEFAULT_SCRIPT);
   const [isEditing, setIsEditing] = useState(false);
+  const textInputRef = useRef<TextInput>(null);
+  const scrollYRef = useRef(0);
+  const isScrollingRef = useRef(false);
+  const scrollEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [optionsAnchorY, setOptionsAnchorY] = useState(0);
   const optionsBtnRef = useRef<View>(null);
@@ -133,6 +138,7 @@ export default function EditorScreen() {
   const { toast, show } = useToast();
   const appBarAnim = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [scrollY, setScrollY] = useState(0);
   const [scrollContentH, setScrollContentH] = useState(0);
   const [scrollViewH, setScrollViewH] = useState(0);
@@ -142,7 +148,6 @@ export default function EditorScreen() {
 
   const handleScrollToTop = () => scrollRef.current?.scrollTo({ y: 0, animated: true });
   const handleScrollToBottom = () => scrollRef.current?.scrollToEnd({ animated: true });
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // Crossfade app bar between view and edit mode
   useEffect(() => {
@@ -160,22 +165,19 @@ export default function EditorScreen() {
     }, [])
   );
 
+  // Track keyboard height so the Done button (position:absolute) can stay above it.
+  // KAV behavior="padding" only helps flow children; absolute children need this.
   useEffect(() => {
-    const show = Keyboard.addListener('keyboardWillShow', (e: KeyboardEvent) => {
+    const onShow = Keyboard.addListener('keyboardWillShow', (e: KeyboardEvent) => {
       setKeyboardHeight(e.endCoordinates.height - insets.bottom);
     });
-    const hide = Keyboard.addListener('keyboardWillHide', () => {
+    const onHide = Keyboard.addListener('keyboardWillHide', () => {
       setKeyboardHeight(0);
     });
-    return () => { show.remove(); hide.remove(); };
+    return () => { onShow.remove(); onHide.remove(); };
   }, [insets.bottom]);
 
-  // When keyboard appears in edit mode, scroll to end so cursor is visible
-  useEffect(() => {
-    if (isEditing && keyboardHeight > 0) {
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-    }
-  }, [keyboardHeight, isEditing]);
+
 
   const wordCount = scriptText.trim().split(/\s+/).filter(Boolean).length;
   const readTimeSec = Math.ceil((wordCount / 140) * 60);
@@ -220,6 +222,7 @@ export default function EditorScreen() {
   const handleDone = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setIsEditing(false);
+    textInputRef.current?.blur();
   };
 
   const titleColor = darkMode ? '#8E8E93' : '#8E8E93';
@@ -260,13 +263,10 @@ export default function EditorScreen() {
       </View>
 
       {/* Script content */}
-      <View style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView
           ref={scrollRef}
-          style={[
-            styles.scrollView,
-            isEditing && keyboardHeight > 0 && { marginBottom: keyboardHeight },
-          ]}
+          style={styles.scrollView}
           contentContainerStyle={[
             styles.scrollContent,
             { paddingTop: 96 },
@@ -274,27 +274,46 @@ export default function EditorScreen() {
           ]}
           keyboardShouldPersistTaps="handled"
           scrollEventThrottle={16}
-          onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) =>
-            setScrollY(e.nativeEvent.contentOffset.y)
-          }
+          onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+            const y = e.nativeEvent.contentOffset.y;
+            setScrollY(y);
+            scrollYRef.current = y;
+          }}
           onContentSizeChange={(_, h) => setScrollContentH(h)}
           onLayout={(e) => setScrollViewH(e.nativeEvent.layout.height)}
+          onScrollBeginDrag={() => {
+            isScrollingRef.current = true;
+            if (isEditing) Keyboard.dismiss();
+          }}
+          onScrollEndDrag={() => {
+            if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
+            scrollEndTimerRef.current = setTimeout(() => { isScrollingRef.current = false; }, 200);
+          }}
+          onMomentumScrollEnd={() => {
+            if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
+            scrollEndTimerRef.current = setTimeout(() => { isScrollingRef.current = false; }, 200);
+          }}
         >
-          {isEditing ? (
-            <TextInput
-              value={scriptText}
-              onChangeText={setScriptText}
-              multiline
-              autoFocus
-              style={[styles.scriptInput, { color: fg }]}
-              textAlignVertical="top"
-              keyboardAppearance={darkMode ? 'dark' : 'light'}
-            />
-          ) : (
-            <TouchableWithoutFeedback onPress={() => setIsEditing(true)}>
-              <Text style={[styles.scriptText, { color: fg }]}>{scriptText}</Text>
-            </TouchableWithoutFeedback>
-          )}
+          <TextInput
+            ref={textInputRef}
+            value={scriptText}
+            onChangeText={setScriptText}
+            multiline
+            editable={true}
+            onFocus={() => {
+              // If the user is mid-scroll, reject the focus so the keyboard
+              // doesn't pop. The native touch places the cursor correctly on
+              // a genuine tap because we never intercept it.
+              if (isScrollingRef.current) {
+                textInputRef.current?.blur();
+                return;
+              }
+              setIsEditing(true);
+            }}
+            style={[styles.scriptInput, { color: fg }]}
+            textAlignVertical="top"
+            keyboardAppearance={darkMode ? 'dark' : 'light'}
+          />
         </ScrollView>
 
         {/* Bottom scrim — fades up from bg over controls */}
@@ -318,7 +337,7 @@ export default function EditorScreen() {
           </ScrollButton>
         )}
 
-        {/* Done button — sits just above the keyboard */}
+        {/* Done button — positioned above keyboard using tracked height */}
         {isEditing && (
           <View style={[styles.doneBtnShadow, { bottom: keyboardHeight + 16 }]}>
             <TouchableOpacity style={styles.doneBtnClip} onPress={handleDone} activeOpacity={0.8}>
@@ -378,7 +397,7 @@ export default function EditorScreen() {
             <Text style={styles.readTime}>{readTimeLabel}</Text>
           </View>
         )}
-      </View>
+      </KeyboardAvoidingView>
       <OptionsMenu
         visible={optionsOpen}
         onClose={() => setOptionsOpen(false)}
@@ -443,12 +462,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingTop: 16,
     paddingBottom: 240,
-  },
-  scriptText: {
-    fontSize: 48,
-    fontWeight: '600',
-    color: '#000',
-    lineHeight: 56,
   },
   scriptInput: {
     fontSize: 48,
